@@ -4,12 +4,11 @@
 {% block content %}
 <div class="page-header">
   <h1>Search filters</h1>
-  <p>Each active filter is scanned automatically on schedule</p>
+  <p>Each active filter is scanned at 8:00 AM and 8:00 PM Mountain Time</p>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+<div style="display:grid;grid-template-columns:1fr 400px;gap:20px;align-items:start">
 
-  <!-- Existing filters -->
   <div>
     {% if filters %}
     {% for f in filters %}
@@ -24,10 +23,10 @@
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text2)">
             {% if f.make %}<span class="mono">{{ f.make }} {{ f.model }}</span>{% endif %}
-            {% if f.year_min or f.year_max < 9999 %}<span>{{ f.year_min or '—' }}–{{ f.year_max if f.year_max < 9999 else '—' }}</span>{% endif %}
-            {% if f.price_min or f.price_max < 999999 %}<span>${{ "{:,}".format(f.price_min) }}–${{ "{:,}".format(f.price_max) if f.price_max < 999999 else '?' }}</span>{% endif %}
+            {% if f.year_min or f.year_max < 9999 %}<span>{{ f.year_min or "—" }}–{{ f.year_max if f.year_max < 9999 else "—" }}</span>{% endif %}
+            {% if f.target_price %}<span style="color:var(--green-t)">Target: ${{ "{:,}".format(f.target_price) }}</span>{% endif %}
             {% if f.miles_max < 999999 %}<span>Under {{ "{:,}".format(f.miles_max) }} mi</span>{% endif %}
-            <span>📍 {{ f.zip_code }} ({{ f.radius_mi }} mi radius)</span>
+            <span>📍 {{ f.zip_code }} ({{ f.radius_mi }} mi)</span>
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -44,14 +43,12 @@
     {% else %}
     <div class="card">
       <div class="empty">
-        <div class="empty-icon">🔍</div>
-        <div>No search filters yet. Add one →</div>
+        <div>No search filters yet. Add one to get started.</div>
       </div>
     </div>
     {% endif %}
   </div>
 
-  <!-- New filter form -->
   <div class="card">
     <div class="section-title">New search filter</div>
     <form method="POST" action="/filters/new">
@@ -59,7 +56,6 @@
         <label class="field-label">Filter name</label>
         <input type="text" name="name" placeholder="e.g. Honda Civics under $12k" required/>
       </div>
-
       <div class="form-row">
         <div>
           <label class="field-label">Make</label>
@@ -70,34 +66,25 @@
           <input type="text" name="model" placeholder="Civic"/>
         </div>
       </div>
-
       <div class="form-row">
         <div>
           <label class="field-label">Year from</label>
-          <input type="number" name="year_min" placeholder="2015" min="1990" max="2030"/>
+          <input type="number" name="year_min" placeholder="2015"/>
         </div>
         <div>
           <label class="field-label">Year to</label>
-          <input type="number" name="year_max" placeholder="2023" min="1990" max="2030"/>
+          <input type="number" name="year_max" placeholder="2023"/>
         </div>
       </div>
-
-      <div class="form-row">
-        <div>
-          <label class="field-label">Min price ($)</label>
-          <input type="number" name="price_min" placeholder="0" min="0"/>
-        </div>
-        <div>
-          <label class="field-label">Max price ($)</label>
-          <input type="number" name="price_max" placeholder="15000" min="0"/>
-        </div>
+      <div class="form-group">
+        <label class="field-label">Target price ($) <span style="color:var(--green-t)">— your MMR research</span></label>
+        <input type="number" name="target_price" placeholder="e.g. 14000" min="0"/>
+        <div class="text2" style="font-size:11px;margin-top:4px">At or below this = urgent alert. Up to X% above = AI outreach.</div>
       </div>
-
       <div class="form-group">
         <label class="field-label">Max mileage</label>
         <input type="number" name="miles_max" placeholder="120000" min="0"/>
       </div>
-
       <div class="form-row">
         <div>
           <label class="field-label">ZIP code</label>
@@ -108,7 +95,6 @@
           <input type="number" name="radius_mi" placeholder="100" value="100" min="10"/>
         </div>
       </div>
-
       <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px">
         Add filter
       </button>
