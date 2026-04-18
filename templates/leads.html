@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %} — Leads{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Leads</h1>
+  <p>All matched listings and outreach history</p>
+</div>
+
+<!-- Filter tabs -->
+<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap">
+  {% for s, label in [('','All'), ('new','New'), ('contacted','Contacted'), ('replied','Replied'), ('deal','Deals'), ('dead','Dead')] %}
+  <a href="/leads{% if s %}?status={{ s }}{% endif %}"
+     class="btn btn-sm {% if active_status == s %}btn-primary{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="card">
+  {% if leads %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Vehicle</th>
+          <th>Price</th>
+          <th>Mileage</th>
+          <th>Location</th>
+          <th>Seller</th>
+          <th>Found</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td>
+            {% if lead.image_url %}
+            <img src="{{ lead.image_url }}" class="pill-img" alt="" onerror="this.style.display='none'"/>
+            {% else %}
+            <div class="pill-img" style="display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:16px">🚗</div>
+            {% endif %}
+          </td>
+          <td style="max-width:220px">
+            <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lead.title or 'Unknown' }}</div>
+          </td>
+          <td class="mono">{% if lead.price %}${{ "{:,}".format(lead.price) }}{% else %}—{% endif %}</td>
+          <td class="mono text2">{% if lead.mileage %}{{ "{:,}".format(lead.mileage) }}{% else %}—{% endif %}</td>
+          <td class="text2" style="white-space:nowrap">{{ lead.location or '—' }}</td>
+          <td class="text2">{{ lead.seller_name or '—' }}</td>
+          <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ lead.found_at.strftime('%b %d') if lead.found_at else '—' }}</td>
+          <td><span class="badge badge-{{ lead.status }}">{{ lead.status }}</span></td>
+          <td><a href="/lead/{{ lead.id }}" class="btn btn-sm">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <div class="empty-icon">📭</div>
+    <div>No leads {% if active_status %}with status "{{ active_status }}"{% else %}yet{% endif %}.</div>
+    {% if not active_status %}
+    <br><a href="/filters" class="btn btn-primary" style="display:inline-flex">Add a search filter →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

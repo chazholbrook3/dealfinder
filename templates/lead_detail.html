@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %} — {{ lead.title }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:18px">
+  <a href="/leads" class="text2" style="font-size:13px">← Back to leads</a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+
+  <!-- Left: listing info -->
+  <div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px">
+        <div>
+          <h1 style="font-size:18px;font-weight:600;margin-bottom:4px">{{ lead.title or 'Unknown vehicle' }}</h1>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            {% if lead.price %}<span class="mono" style="font-size:16px;color:var(--green-t)">${{ "{:,}".format(lead.price) }}</span>{% endif %}
+            {% if lead.mileage %}<span class="text2 mono" style="font-size:13px">{{ "{:,}".format(lead.mileage) }} mi</span>{% endif %}
+            {% if lead.year %}<span class="text2 mono" style="font-size:13px">{{ lead.year }}</span>{% endif %}
+            {% if lead.location %}<span class="text2" style="font-size:13px">📍 {{ lead.location }}</span>{% endif %}
+          </div>
+        </div>
+        <span class="badge badge-{{ lead.status }}" style="font-size:13px;padding:4px 12px;flex-shrink:0">{{ lead.status }}</span>
+      </div>
+
+      {% if lead.image_url %}
+      <img src="{{ lead.image_url }}" style="width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin-bottom:16px" onerror="this.style.display='none'"/>
+      {% endif %}
+
+      {% if lead.description %}
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;border-top:1px solid var(--border);padding-top:14px">
+        {{ lead.description }}
+      </div>
+      {% endif %}
+
+      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+        <a href="{{ lead.listing_url }}" target="_blank" class="btn btn-primary btn-sm">View on KSL →</a>
+        {% if lead.seller_phone %}
+        <a href="tel:{{ lead.seller_phone }}" class="btn btn-sm">📞 {{ lead.seller_phone }}</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Seller info -->
+    {% if lead.seller_name or lead.seller_phone %}
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-title">Seller</div>
+      {% if lead.seller_name %}<div style="font-weight:500;margin-bottom:4px">{{ lead.seller_name }}</div>{% endif %}
+      {% if lead.seller_phone %}<div class="mono text2 font-size:13px">{{ lead.seller_phone }}</div>{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Status & notes -->
+    <div class="card">
+      <div class="section-title">Status & notes</div>
+      <div class="form-group">
+        <label class="field-label">Status</label>
+        <select id="status-select" onchange="saveStatus()">
+          <option value="new"       {% if lead.status=='new' %}selected{% endif %}>New</option>
+          <option value="contacted" {% if lead.status=='contacted' %}selected{% endif %}>Contacted</option>
+          <option value="replied"   {% if lead.status=='replied' %}selected{% endif %}>Replied</option>
+          <option value="deal"      {% if lead.status=='deal' %}selected{% endif %}>Deal!</option>
+          <option value="dead"      {% if lead.status=='dead' %}selected{% endif %}>No reply / dead</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="field-label">Notes</label>
+        <textarea id="notes-area" rows="4" placeholder="Anything worth remembering about this lead…">{{ lead.notes or '' }}</textarea>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveNotes()">Save notes</button>
+    </div>
+  </div>
+
+  <!-- Right: AI messages -->
+  <div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="section-title" style="margin-bottom:0">AI outreach</div>
+        <button class="btn btn-sm" onclick="regenerate(this)">Regenerate</button>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.7px;color:var(--text2);margin-bottom:6px">Facebook DM</div>
+        <div id="fb-msg" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;line-height:1.7;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;min-height:80px">{{ lead.ai_message_fb or 'No message generated yet.' }}</div>
+        <button class="btn btn-sm" style="margin-top:8px" onclick="copyText(document.getElementById('fb-msg').textContent,'Facebook message copied!')">Copy</button>
+      </div>
+
+      <div>
+        <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.7px;color:var(--text2);margin-bottom:6px">SMS text</div>
+        <div id="sms-msg" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;line-height:1.7;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;min-height:60px">{{ lead.ai_message_sms or 'No message generated yet.' }}</div>
+        <div id="sms-chars" style="font-size:11px;color:var(--text3);margin-top:3px;font-family:var(--mono)"></div>
+        <button class="btn btn-sm" style="margin-top:8px" onclick="copyText(document.getElementById('sms-msg').textContent,'SMS copied!')">Copy</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const LEAD_ID = {{ lead.id }};
+
+async function saveStatus() {
+  const status = document.getElementById('status-select').value;
+  await fetch(`/api/lead/${LEAD_ID}/status`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ status })
+  });
+  toast('Status updated');
+}
+
+async function saveNotes() {
+  const notes = document.getElementById('notes-area').value;
+  await fetch(`/api/lead/${LEAD_ID}/status`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ notes })
+  });
+  toast('Notes saved');
+}
+
+async function regenerate(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Regenerating…';
+  try {
+    const r = await fetch(`/api/lead/${LEAD_ID}/regenerate`, { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('fb-msg').textContent  = d.fb  || '';
+      document.getElementById('sms-msg').textContent = d.sms || '';
+      updateSmsCount();
+      toast('Messages regenerated!');
+    } else {
+      toast('Error: ' + d.error);
+    }
+  } catch(e) {
+    toast('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Regenerate';
+  }
+}
+
+function updateSmsCount() {
+  const sms = document.getElementById('sms-msg').textContent;
+  const el  = document.getElementById('sms-chars');
+  const len = sms.length;
+  el.textContent = `${len} chars${len > 160 ? ' — may split into 2 SMS' : ''}`;
+  el.style.color = len > 160 ? 'var(--amber)' : 'var(--text3)';
+}
+
+updateSmsCount();
+</script>
+{% endblock %}

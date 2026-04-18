@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %} — Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <p>KSL auto-scanner with Mannheim MMR deal scoring</p>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total leads</div>
+    <div class="stat-value">{{ stats.total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Urgent deals</div>
+    <div class="stat-value" style="color:var(--red)">{{ stats.urgent }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Opportunities</div>
+    <div class="stat-value" style="color:var(--amber)">{{ stats.opportunity }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Deals closed</div>
+    <div class="stat-value" style="color:#60dc80">{{ stats.deal }}</div>
+  </div>
+</div>
+
+<!-- MMR Thresholds -->
+<div class="card" style="margin-bottom:20px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+    <div>
+      <div class="section-title" style="margin-bottom:2px">Deal scoring thresholds</div>
+      <div class="text2" style="font-size:12px">Adjust without redeploying — changes take effect on the next scan</div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="saveThresholds()">Save</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <label class="field-label">🚨 Tier 1 — Urgent (% at or below MMR)</label>
+      <input type="number" id="tier1_pct" value="{{ settings.get('tier1_pct', '0') }}" step="1" min="-50" max="20"/>
+      <div class="text2" style="font-size:11px;margin-top:4px">Broker gets urgent SMS — call NOW. Default: 0 (at or below MMR)</div>
+    </div>
+    <div>
+      <label class="field-label">💡 Tier 2 — Opportunity (% above MMR)</label>
+      <input type="number" id="tier2_pct" value="{{ settings.get('tier2_pct', '10') }}" step="1" min="0" max="50"/>
+      <div class="text2" style="font-size:11px;margin-top:4px">AI sends outreach automatically. Default: 10 (up to 10% above MMR)</div>
+    </div>
+  </div>
+  <div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.6">
+    <strong style="color:var(--text)">How it works:</strong>
+    Anything listed <strong style="color:var(--red)">at or below MMR</strong> → Tier 1 urgent alert to broker.
+    Listed up to <strong style="color:var(--amber)">{{ settings.get('tier2_pct','10') }}% above MMR</strong> → Tier 2 AI outreach sent.
+    Above that → skipped entirely.
+  </div>
+</div>
+
+<!-- Quick actions -->
+<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+  <button class="btn btn-primary" onclick="triggerScan(this)">
+    Scan now
+  </button>
+  <a href="/leads?tier=1" class="btn" style="color:var(--red);border-color:rgba(224,82,82,0.3)">🚨 Urgent leads</a>
+  <a href="/leads?tier=2" class="btn" style="color:var(--amber);border-color:rgba(245,166,35,0.3)">💡 Opportunities</a>
+  <a href="/filters" class="btn">Manage searches</a>
+</div>
+
+<!-- Recent leads -->
+<div class="card">
+  <div class="section-title">Recent leads</div>
+  {% if leads %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Vehicle</th>
+          <th>Listed</th>
+          <th>MMR</th>
+          <th>vs MMR</th>
+          <th>Tier</th>
+          <th>Found</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td>
+            {% if lead.image_url %}
+            <img src="{{ lead.image_url }}" class="pill-img" alt="" onerror="this.style.display='none'"/>
+            {% else %}
+            <div class="pill-img" style="display:flex;align-items:center;justify-content:center;color:var(--text3)">🚗</div>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-weight:500">{{ lead.title or 'Unknown' }}</div>
+            {% if lead.mileage %}<div class="text2 mono" style="font-size:11px">{{ "{:,}".format(lead.mileage) }} mi</div>{% endif %}
+          </td>
+          <td class="mono">{% if lead.price %}${{ "{:,}".format(lead.price) }}{% else %}—{% endif %}</td>
+          <td class="mono text2">{% if lead.mmr %}${{ "{:,}".format(lead.mmr) }}{% else %}—{% endif %}</td>
+          <td>
+            {% if lead.mmr and lead.price %}
+              {% if lead.pct_vs_mmr <= 0 %}
+                <span class="mono" style="color:var(--green-t)">{{ "{:+.1f}".format(lead.pct_vs_mmr) }}%</span>
+              {% elif lead.pct_vs_mmr <= 10 %}
+                <span class="mono" style="color:var(--amber)">{{ "{:+.1f}".format(lead.pct_vs_mmr) }}%</span>
+              {% else %}
+                <span class="mono" style="color:var(--text2)">{{ "{:+.1f}".format(lead.pct_vs_mmr) }}%</span>
+              {% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if lead.deal_tier == 1 %}
+              <span class="badge" style="background:rgba(224,82,82,0.15);color:var(--red)">🚨 Urgent</span>
+            {% elif lead.deal_tier == 2 %}
+              <span class="badge" style="background:var(--amber-bg);color:var(--amber)">💡 Opportunity</span>
+            {% endif %}
+          </td>
+          <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ lead.found_at.strftime('%b %d %I:%M %p') if lead.found_at else '—' }}</td>
+          <td><span class="badge badge-{{ lead.status }}">{{ lead.status }}</span></td>
+          <td><a href="/lead/{{ lead.id }}" class="btn btn-sm">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <div class="empty-icon">📭</div>
+    <div>No leads yet. Add a search filter and run a scan.</div>
+    <br><a href="/filters" class="btn btn-primary" style="display:inline-flex">Add search filter</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function triggerScan(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Scanning…';
+  try {
+    const r = await fetch('/api/scan/now', { method: 'POST' });
+    const d = await r.json();
+    toast(d.ok ? 'Scan complete — reload to see results' : ('Error: ' + d.error));
+    if (d.ok) setTimeout(() => location.reload(), 1800);
+  } catch(e) {
+    toast('Scan failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Scan now';
+  }
+}
+
+async function saveThresholds() {
+  const t1 = document.getElementById('tier1_pct').value;
+  const t2 = document.getElementById('tier2_pct').value;
+  const r = await fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ tier1_pct: t1, tier2_pct: t2 })
+  });
+  const d = await r.json();
+  toast(d.ok ? 'Thresholds saved!' : 'Error saving');
+}
+</script>
+{% endblock %}

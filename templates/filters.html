@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %} — Search Filters{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Search filters</h1>
+  <p>Each active filter is scanned automatically on schedule</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+
+  <!-- Existing filters -->
+  <div>
+    {% if filters %}
+    {% for f in filters %}
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <span style="font-weight:600;font-size:15px">{{ f.name }}</span>
+            <span class="badge {% if f.active %}badge-new{% else %}badge-dead{% endif %}">
+              {% if f.active %}active{% else %}paused{% endif %}
+            </span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text2)">
+            {% if f.make %}<span class="mono">{{ f.make }} {{ f.model }}</span>{% endif %}
+            {% if f.year_min or f.year_max < 9999 %}<span>{{ f.year_min or '—' }}–{{ f.year_max if f.year_max < 9999 else '—' }}</span>{% endif %}
+            {% if f.price_min or f.price_max < 999999 %}<span>${{ "{:,}".format(f.price_min) }}–${{ "{:,}".format(f.price_max) if f.price_max < 999999 else '?' }}</span>{% endif %}
+            {% if f.miles_max < 999999 %}<span>Under {{ "{:,}".format(f.miles_max) }} mi</span>{% endif %}
+            <span>📍 {{ f.zip_code }} ({{ f.radius_mi }} mi radius)</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <form method="POST" action="/filters/{{ f.id }}/toggle" style="display:inline">
+            <button class="btn btn-sm">{% if f.active %}Pause{% else %}Resume{% endif %}</button>
+          </form>
+          <form method="POST" action="/filters/{{ f.id }}/delete" style="display:inline" onsubmit="return confirm('Delete this filter?')">
+            <button class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="card">
+      <div class="empty">
+        <div class="empty-icon">🔍</div>
+        <div>No search filters yet. Add one →</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- New filter form -->
+  <div class="card">
+    <div class="section-title">New search filter</div>
+    <form method="POST" action="/filters/new">
+      <div class="form-group">
+        <label class="field-label">Filter name</label>
+        <input type="text" name="name" placeholder="e.g. Honda Civics under $12k" required/>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label class="field-label">Make</label>
+          <input type="text" name="make" placeholder="Honda"/>
+        </div>
+        <div>
+          <label class="field-label">Model</label>
+          <input type="text" name="model" placeholder="Civic"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label class="field-label">Year from</label>
+          <input type="number" name="year_min" placeholder="2015" min="1990" max="2030"/>
+        </div>
+        <div>
+          <label class="field-label">Year to</label>
+          <input type="number" name="year_max" placeholder="2023" min="1990" max="2030"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label class="field-label">Min price ($)</label>
+          <input type="number" name="price_min" placeholder="0" min="0"/>
+        </div>
+        <div>
+          <label class="field-label">Max price ($)</label>
+          <input type="number" name="price_max" placeholder="15000" min="0"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="field-label">Max mileage</label>
+        <input type="number" name="miles_max" placeholder="120000" min="0"/>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label class="field-label">ZIP code</label>
+          <input type="text" name="zip_code" placeholder="84101" value="84101"/>
+        </div>
+        <div>
+          <label class="field-label">Radius (miles)</label>
+          <input type="number" name="radius_mi" placeholder="100" value="100" min="10"/>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px">
+        Add filter
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
