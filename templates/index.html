@@ -38,12 +38,12 @@
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div>
-      <label class="field-label">🚨 Tier 1 — Urgent (% at or below MMR)</label>
+      <label class="field-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Tier 1 — Urgent (% at or below MMR)</label>
       <input type="number" id="tier1_pct" value="{{ settings.get('tier1_pct', '0') }}" step="1" min="-50" max="20"/>
       <div class="text2" style="font-size:11px;margin-top:4px">Broker gets urgent SMS — call NOW. Default: 0 (at or below MMR)</div>
     </div>
     <div>
-      <label class="field-label">💡 Tier 2 — Opportunity (% above MMR)</label>
+      <label class="field-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14"/></svg> Tier 2 — Opportunity (% above MMR)</label>
       <input type="number" id="tier2_pct" value="{{ settings.get('tier2_pct', '10') }}" step="1" min="0" max="50"/>
       <div class="text2" style="font-size:11px;margin-top:4px">AI sends outreach automatically. Default: 10 (up to 10% above MMR)</div>
     </div>
@@ -61,8 +61,8 @@
   <button class="btn btn-primary" onclick="triggerScan(this)">
     Scan now
   </button>
-  <a href="/leads?tier=1" class="btn" style="color:var(--red);border-color:rgba(224,82,82,0.3)">🚨 Urgent leads</a>
-  <a href="/leads?tier=2" class="btn" style="color:var(--amber);border-color:rgba(245,166,35,0.3)">💡 Opportunities</a>
+  <a href="/leads?tier=1" class="btn" style="color:var(--red);border-color:rgba(224,82,82,0.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Urgent leads</a>
+  <a href="/leads?tier=2" class="btn" style="color:var(--amber);border-color:rgba(245,166,35,0.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14"/></svg> Opportunities</a>
   <a href="/filters" class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Manage searches</a>
 </div>
 
@@ -92,7 +92,7 @@
             {% if lead.image_url %}
             <img src="{{ lead.image_url }}" class="pill-img" alt="" onerror="this.style.display='none'"/>
             {% else %}
-            <div class="pill-img" style="display:flex;align-items:center;justify-content:center;color:var(--text3)">🚗</div>
+            <div class="pill-img" style="display:flex;align-items:center;justify-content:center;color:var(--text3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M19 17H5a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v6a2 2 0 01-2 2z"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M5 9l2-4h10l2 4"/></svg></div>
             {% endif %}
           </td>
           <td>
@@ -114,9 +114,9 @@
           </td>
           <td>
             {% if lead.deal_tier == 1 %}
-              <span class="badge" style="background:rgba(224,82,82,0.15);color:var(--red)">🚨 Urgent</span>
+              <span class="badge" style="background:rgba(224,82,82,0.15);color:var(--red)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Urgent</span>
             {% elif lead.deal_tier == 2 %}
-              <span class="badge" style="background:var(--amber-bg);color:var(--amber)">💡 Opportunity</span>
+              <span class="badge" style="background:var(--amber-bg);color:var(--amber)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14"/></svg> Opportunity</span>
             {% endif %}
           </td>
           <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ lead.found_at.strftime('%b %d %I:%M %p') if lead.found_at else '—' }}</td>
@@ -129,7 +129,7 @@
   </div>
   {% else %}
   <div class="empty">
-    <div class="empty-icon">📭</div>
+    <div class="empty-icon"></div>
     <div>No leads yet. Add a search filter and run a scan.</div>
     <br><a href="/filters" class="btn btn-primary" style="display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Add search filter</a>
   </div>
