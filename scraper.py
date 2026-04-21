@@ -76,7 +76,7 @@ def scrape_listings(search_filter, max_results=20):
     log.info(f"Scraping KSL: {url}")
 
     try:
-        resp = requests.get(url, headers=HEADERS, proxies=get_proxies(), timeout=20)
+        resp = requests.get(url, headers=HEADERS, proxies=get_proxies(), timeout=20, verify=False)
         resp.raise_for_status()
     except requests.RequestException as e:
         log.error(f"KSL fetch failed: {e}")
@@ -216,7 +216,7 @@ def fetch_listing_detail(url):
     Returns a dict of extra fields.
     """
     try:
-        resp = requests.get(url, headers=HEADERS, proxies=get_proxies(), timeout=20)
+        resp = requests.get(url, headers=HEADERS, proxies=get_proxies(), timeout=20, verify=False)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
