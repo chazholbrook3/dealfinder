@@ -16,6 +16,7 @@ KSL's public search URL structure:
 """
 
 import re
+import os
 import logging
 import requests
 from bs4 import BeautifulSoup
@@ -38,6 +39,17 @@ HEADERS = {
 }
 
 KSL_BASE = "https://classifieds.ksl.com"
+
+
+def get_proxies():
+    host = os.environ.get("BRIGHTDATA_HOST")
+    port = os.environ.get("BRIGHTDATA_PORT")
+    user = os.environ.get("BRIGHTDATA_USER")
+    pwd  = os.environ.get("BRIGHTDATA_PASS")
+    if all([host, port, user, pwd]):
+        proxy_url = f"http://{user}:{pwd}@{host}:{port}"
+        return {"http": proxy_url, "https": proxy_url}
+    return None
 
 
 def build_search_url(f):
@@ -64,7 +76,7 @@ def scrape_listings(search_filter, max_results=20):
     log.info(f"Scraping KSL: {url}")
 
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = requests.get(url, headers=HEADERS, proxies=get_proxies(), timeout=20)
         resp.raise_for_status()
     except requests.RequestException as e:
         log.error(f"KSL fetch failed: {e}")
@@ -204,7 +216,7 @@ def fetch_listing_detail(url):
     Returns a dict of extra fields.
     """
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = requests.get(url, headers=HEADERS, proxies=get_proxies(), timeout=20)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
