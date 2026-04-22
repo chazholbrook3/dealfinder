@@ -52,6 +52,53 @@ def get_proxies():
     return None
 
 
+
+def _extract_listings_from_nextjs(html, max_results=20):
+    """
+    KSL uses Next.js which embeds listing data as JSON inside self.__next_f.push script tags.
+    """
+    import json
+    listings = []
+
+    chunks = re.findall(r'self\\.__next_f\\.push\\(\\[1,\\s*"(.*?)"\\]\\)', html, re.DOTALL)
+
+    combined = ""
+    for chunk in chunks:
+        try:
+            combined += chunk.encode().decode('unicode_escape')
+        except Exception:
+            combined += chunk
+
+    match = re.search(r'"results":\\[\\[(.*?)\\]\\]', combined, re.DOTALL)
+    if not match:
+        log.warning("Could not find results array in Next.js payload")
+        return []
+
+    try:
+        items = json.loads(f"[{match.group(1)}]")
+    except Exception as e:
+        log.error(f"Failed to parse results JSON: {e}")
+        return []
+
+    for item in items[:max_results]:
+        try:
+            loc = item.get("location", {})
+            listings.append({
+                "listing_id":  str(item["id"]),
+                "title":       item.get("title", ""),
+                "price":       float(item.get("price", 0)),
+                "city":        loc.get("city", ""),
+                "state":       loc.get("state", ""),
+                "url":         f"https://classifieds.ksl.com/listing/{item['id']}",
+                "image_url":   (item.get("primaryImage") or {}).get("url", ""),
+                "seller_type": item.get("sellerType", ""),
+            })
+        except Exception as e:
+            log.warning(f"Skipping malformed listing: {e}")
+
+    log.info(f"Extracted {len(listings)} listings from Next.js payload")
+    return listings
+
 def build_search_url(f):
     """Build KSL search URL from a SearchFilter object."""
     params = {"category": "cars-trucks"}
@@ -82,8 +129,11 @@ def scrape_listings(search_filter, max_results=20):
         log.error(f"KSL fetch failed: {e}")
         return []
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-    listings = []
+    listings = _extract_listings_from_nextjs(resp.text, max_results)
+
+    if False:  # old HTML parsing disabled
+        soup = BeautifulSoup(resp.text, "html.parser")
+        listings_old = []
 
     # KSL listing cards — each is an <li> or <div> with a data-id attribute
     cards = soup.select("li.search-result, div.listing-item, article.listing")
