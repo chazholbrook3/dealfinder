@@ -78,11 +78,11 @@ def scrape_listings(search_filter, max_results=20):
 
 def _extract_from_html(html, max_results=20):
     listings = []
-    match = re.search(r'\\"results\\":\[\[(.*?)\]\]', html, re.DOTALL)
+    match = re.search(r'"results":\[\[(.*?)\]\]', html, re.DOTALL)
     if not match:
         log.warning("Could not find results in page")
         return []
-    raw = match.group(1).replace('\\"', '"').replace('\\\\', '\\')
+    raw = match.group(1)
     try:
         items = json.loads(f"[{raw}]")
     except Exception as e:
