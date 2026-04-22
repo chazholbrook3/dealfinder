@@ -199,7 +199,7 @@ def debug_ksl():
     proxy_url = f"http://{user}:{pwd}@{host}:{port}"
     proxies = {"http": proxy_url, "https": proxy_url}
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    url = "https://classifieds.ksl.com/search/?category=cars-trucks&make=Toyota&model=Camry&yearFrom=2015&yearTo=2023&mileageTo=150000&zip=84101&miles=100"
+    url = "https://classifieds.ksl.com/search/?category=cars-trucks&make=Toyota&model=Camry&yearFrom=2015&yearTo=2023"
     resp = requests.get(url, headers=headers, proxies=proxies, timeout=20, verify=False)
     # Return the raw HTML so we can see exactly what the proxy gets
     return resp.text, 200, {"Content-Type": "text/plain"}
