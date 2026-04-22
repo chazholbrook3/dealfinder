@@ -196,11 +196,27 @@ def debug_ksl():
     port = os.environ.get("BRIGHTDATA_PORT")
     user = os.environ.get("BRIGHTDATA_USER")
     pwd  = os.environ.get("BRIGHTDATA_PASS")
-    proxy_url = f"http://{user}:{pwd}@{host}:{port}"
-    proxies = {"http": proxy_url, "https": proxy_url}
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     url = "https://classifieds.ksl.com/search/?category=cars-trucks&make=Toyota&model=Camry&yearFrom=2015&yearTo=2023"
-    resp = requests.get(url, headers=headers, proxies=proxies, timeout=20, verify=False)
-    # Return the raw HTML so we can see exactly what the proxy gets
-    return resp.text, 200, {"Content-Type": "text/plain"}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    results = []
+    for i in range(7, 30):
+        session = f"ktfinds{i}"
+        proxy_url = f"http://{user}-session-{session}-country-us:{pwd}@{host}:{port}"
+        px = {"http": proxy_url, "https": proxy_url}
+        try:
+            r = requests.get(url, headers=headers, proxies=px, timeout=10, verify=False)
+            body = r.text
+            if "Request Blocked" in body:
+                results.append(f"{session}: BLOCKED")
+            elif "px-captcha" in body or "perimeterx" in body.lower():
+                results.append(f"{session}: CAPTCHA")
+            elif '"results"' in body:
+                results.append(f"{session}: SUCCESS!")
+                break
+            else:
+                results.append(f"{session}: HTML no results len={len(body)}")
+        except Exception as e:
+            results.append(f"{session}: ERROR {str(e)[:80]}")
+    return "
+".join(results), 200, {"Content-Type": "text/plain"}
 
