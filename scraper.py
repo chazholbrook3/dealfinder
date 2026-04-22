@@ -1,5 +1,6 @@
 """
-scraper.py — fetches KSL car listings via KSL's internal Next.js API.
+scraper.py — scrapes KSL Classifieds by fetching the search page HTML
+and extracting the embedded Next.js JSON payload.
 """
 
 import os
@@ -7,22 +8,22 @@ import re
 import json
 import logging
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from urllib.parse import urlencode
 
 log = logging.getLogger(__name__)
 
-KSL_API  = "https://classifieds.ksl.com/nextjs-api/proxy"
 KSL_BASE = "https://classifieds.ksl.com"
 
-API_HEADERS = {
+HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Content-Type": "application/json",
-    "Referer": "https://classifieds.ksl.com/",
-    "Origin": "https://classifieds.ksl.com",
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-origin",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Cache-Control": "max-age=0",
 }
 
 
@@ -39,103 +40,84 @@ def get_proxies():
     return None
 
 
-def build_api_params(f):
-    params = {}
-    if f.make:               params["make"]      = [f.make]
-    if f.model:              params["model"]     = [f.model]
-    if f.year_min:           params["yearFrom"]  = str(f.year_min)
-    if f.year_max < 9999:    params["yearTo"]    = str(f.year_max)
-    if f.price_min:          params["priceFrom"] = str(f.price_min)
-    if f.price_max < 999999: params["priceTo"]   = str(f.price_max)
-    if f.miles_max < 999999: params["mileageTo"] = str(f.miles_max)
+def build_search_url(f):
+    params = {"category": "cars-trucks"}
+    if f.make:               params["make"]      = f.make
+    if f.model:              params["model"]     = f.model
+    if f.year_min:           params["yearFrom"]  = f.year_min
+    if f.year_max < 9999:    params["yearTo"]    = f.year_max
+    if f.price_min:          params["priceFrom"] = f.price_min
+    if f.price_max < 999999: params["priceTo"]   = f.price_max
+    if f.miles_max < 999999: params["mileageTo"] = f.miles_max
     if f.zip_code:           params["zip"]       = f.zip_code
-    if f.radius_mi:          params["miles"]     = str(f.radius_mi)
-    params["perPage"] = 20
-    params["page"]    = 1
-    return params
+    if f.radius_mi:          params["miles"]     = f.radius_mi
+    return f"{KSL_BASE}/search/?{urlencode(params)}"
 
 
 def scrape_listings(search_filter, max_results=20):
-    body = build_api_params(search_filter)
-    log.info(f"Calling KSL API for '{search_filter.name}': {body}")
+    url = build_search_url(search_filter)
+    log.info(f"Scraping KSL: {url}")
 
     try:
-        resp = requests.post(
-            KSL_API,
-            params={"endpoint": "/classifieds/cars/search/searchByUrlParams"},
-            json=body,
-            headers=API_HEADERS,
+        resp = requests.get(
+            url,
+            headers=HEADERS,
             proxies=get_proxies(),
             timeout=20,
             verify=False,
         )
         resp.raise_for_status()
     except requests.RequestException as e:
-        log.error(f"KSL API call failed: {e}")
+        log.error(f"KSL fetch failed: {e}")
         return []
 
-    try:
-        data = resp.json()
-    except Exception as e:
-        log.error(f"KSL API non-JSON response: {e} — {resp.text[:300]}")
-        return []
-
-    items = (
-        data.get("data", {}).get("items") or
-        data.get("items") or
-        data.get("results") or
-        data.get("listings") or
-        []
-    )
-
-    if not items:
-        log.warning(f"KSL API no items. Keys={list(data.keys())} sample={str(data)[:300]}")
-        return []
-
-    listings = []
-    for item in items[:max_results]:
-        try:
-            listing = _parse_api_item(item)
-            if listing:
-                listings.append(listing)
-        except Exception as e:
-            log.warning(f"Skipping item: {e}")
-
+    listings = _extract_from_html(resp.text, max_results)
     log.info(f"Found {len(listings)} listings for '{search_filter.name}'")
     return listings
 
 
-def _parse_api_item(item):
-    listing_id = str(item.get("id") or item.get("listingId") or "")
+def _extract_from_html(html, max_results=20):
+    listings = []
+    match = re.search(r'\\"results\\":\[\[(.*?)\]\]', html, re.DOTALL)
+    if not match:
+        log.warning("Could not find results in page")
+        return []
+    raw = match.group(1).replace('\\"', '"').replace('\\\\', '\\')
+    try:
+        items = json.loads(f"[{raw}]")
+    except Exception as e:
+        log.error(f"Failed to parse listing JSON: {e}")
+        return []
+    for item in items[:max_results]:
+        try:
+            listing = _parse_item(item)
+            if listing:
+                listings.append(listing)
+        except Exception as e:
+            log.warning(f"Skipping item: {e}")
+    return listings
+
+
+def _parse_item(item):
+    listing_id = str(item.get("id") or "")
     if not listing_id:
         return None
-
-    price_raw = item.get("price") or item.get("askingPrice") or 0
+    price_raw = item.get("price") or 0
     try:
         price = float(str(price_raw).replace(",", "").replace("$", ""))
     except (ValueError, TypeError):
         price = 0.0
-
     location = item.get("location") or {}
     city  = location.get("city", "") if isinstance(location, dict) else ""
     state = location.get("state", "") if isinstance(location, dict) else ""
-
-    title = item.get("title") or item.get("name") or ""
+    title = item.get("title") or ""
     year, make, model = _parse_title(title)
-
-    mileage_raw = item.get("mileage") or item.get("miles") or 0
-    try:
-        mileage = int(str(mileage_raw).replace(",", ""))
-    except (ValueError, TypeError):
-        mileage = 0
-
     image_url = ""
     primary = item.get("primaryImage")
     if isinstance(primary, dict):
         image_url = primary.get("url", "")
     elif isinstance(primary, str):
         image_url = primary
-
     return {
         "listing_id":   listing_id,
         "ksl_id":       listing_id,
@@ -144,7 +126,7 @@ def _parse_api_item(item):
         "year":         year,
         "make":         make,
         "model":        model,
-        "mileage":      mileage,
+        "mileage":      0,
         "city":         city,
         "state":        state,
         "location":     f"{city}, {state}".strip(", "),
@@ -152,15 +134,15 @@ def _parse_api_item(item):
         "listing_url":  f"{KSL_BASE}/listing/{listing_id}",
         "url":          f"{KSL_BASE}/listing/{listing_id}",
         "description":  item.get("description", ""),
-        "seller_name":  item.get("sellerName", ""),
-        "seller_phone": item.get("phone", ""),
+        "seller_name":  "",
+        "seller_phone": "",
         "seller_type":  item.get("sellerType", ""),
     }
 
 
 def fetch_listing_detail(url):
     try:
-        resp = requests.get(url, headers=API_HEADERS, proxies=get_proxies(), timeout=20, verify=False)
+        resp = requests.get(url, headers=HEADERS, proxies=get_proxies(), timeout=20, verify=False)
         resp.raise_for_status()
         match = re.search(r'"description"\s*:\s*"(.*?)"(?=[,}])', resp.text)
         description = match.group(1) if match else ""
@@ -170,16 +152,6 @@ def fetch_listing_detail(url):
     except Exception as e:
         log.warning(f"Detail fetch failed for {url}: {e}")
         return {}
-
-
-def _parse_price(text):
-    nums = re.findall(r"\d+", str(text).replace(",", ""))
-    return int(nums[0]) if nums else 0
-
-
-def _parse_mileage(text):
-    nums = re.findall(r"[\d,]+", str(text).replace(",", ""))
-    return int(nums[0]) if nums else 0
 
 
 def _parse_title(title):
