@@ -33,7 +33,7 @@ def get_proxies():
     user = os.environ.get("BRIGHTDATA_USER")
     pwd  = os.environ.get("BRIGHTDATA_PASS")
     if all([host, port, user, pwd]):
-        proxy_url = f"http://{user}:{pwd}@{host}:{port}"
+        import random; session_id = random.randint(1, 999999); proxy_url = f"http://{user}-session-{session_id}-country-us:{pwd}@{host}:{port}"
         log.info("Using Bright Data residential proxy")
         return {"http": proxy_url, "https": proxy_url}
     log.warning("No proxy configured")
