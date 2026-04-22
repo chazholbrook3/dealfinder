@@ -135,33 +135,6 @@ def scrape_listings(search_filter, max_results=20):
 
     listings = _extract_listings_from_nextjs(resp.text, max_results)
 
-    # old HTML parsing removed — each is an <li> or <div> with a data-id attribute
-    cards = soup.select("li.search-result, div.listing-item, article.listing")
-
-    # Fallback: find all links that look like /listing/XXXXXX/
-    if not cards:
-        links = soup.find_all("a", href=re.compile(r"/listing/\d+/"))
-        seen_hrefs = set()
-        for link in links:
-            href = link.get("href", "")
-            if href in seen_hrefs:
-                continue
-            seen_hrefs.add(href)
-            listing_id = re.search(r"/listing/(\d+)/", href)
-            if not listing_id:
-                continue
-
-            card_data = _parse_card_from_link(link, listing_id.group(1))
-            if card_data:
-                listings.append(card_data)
-                if len(listings) >= max_results:
-                    break
-    else:
-        for card in cards[:max_results]:
-            card_data = _parse_card(card)
-            if card_data:
-                listings.append(card_data)
-
     log.info(f"Found {len(listings)} listings for filter '{search_filter.name}'")
     return listings
 
