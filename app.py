@@ -187,3 +187,20 @@ if __name__ == "__main__":
     start_scheduler()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+
+@app.route('/debug-ksl')
+def debug_ksl():
+    import requests, os, urllib3
+    urllib3.disable_warnings()
+    host = os.environ.get("BRIGHTDATA_HOST")
+    port = os.environ.get("BRIGHTDATA_PORT")
+    user = os.environ.get("BRIGHTDATA_USER")
+    pwd  = os.environ.get("BRIGHTDATA_PASS")
+    proxy_url = f"http://{user}:{pwd}@{host}:{port}"
+    proxies = {"http": proxy_url, "https": proxy_url}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    url = "https://classifieds.ksl.com/search/?category=cars-trucks&make=Toyota&model=Camry&yearFrom=2015&yearTo=2023"
+    resp = requests.get(url, headers=headers, proxies=proxies, timeout=20, verify=False)
+    # Return the raw HTML so we can see exactly what the proxy gets
+    return resp.text, 200, {"Content-Type": "text/plain"}
+
