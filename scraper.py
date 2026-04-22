@@ -60,16 +60,20 @@ def _extract_listings_from_nextjs(html, max_results=20):
     import json
     listings = []
 
-    chunks = re.findall(r'self\\.__next_f\\.push\\(\\[1,\\s*"(.*?)"\\]\\)', html, re.DOTALL)
-
+    # Extract all next_f push payloads
+    chunks = re.findall(r'self\.__next_f\.push\(\[1,\s*"(.*?)"\]\)', html, re.DOTALL)
     combined = ""
     for chunk in chunks:
         try:
-            combined += chunk.encode().decode('unicode_escape')
+            combined += bytes(chunk, "utf-8").decode("unicode_escape")
         except Exception:
             combined += chunk
 
-    match = re.search(r'"results":\\[\\[(.*?)\\]\\]', combined, re.DOTALL)
+    # Try to find results in combined payload
+    match = re.search(r'"results":\[\[(.*?)\]\]', combined, re.DOTALL)
+    if not match:
+        # Fallback: search raw HTML directly
+        match = re.search(r'"results":\[\[(.*?)\]\]', html, re.DOTALL)
     if not match:
         log.warning("Could not find results array in Next.js payload")
         return []
@@ -131,11 +135,7 @@ def scrape_listings(search_filter, max_results=20):
 
     listings = _extract_listings_from_nextjs(resp.text, max_results)
 
-    if False:  # old HTML parsing disabled
-        soup = BeautifulSoup(resp.text, "html.parser")
-        listings_old = []
-
-    # KSL listing cards — each is an <li> or <div> with a data-id attribute
+    # old HTML parsing removed — each is an <li> or <div> with a data-id attribute
     cards = soup.select("li.search-result, div.listing-item, article.listing")
 
     # Fallback: find all links that look like /listing/XXXXXX/
