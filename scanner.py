@@ -46,9 +46,9 @@ def run_scan(app):
                 if Lead.query.filter_by(ksl_id=ksl_id).first():
                     continue
 
-                # title_unknown and detail fields (phone, mileage, etc.) are
-                # already set by scrape_listings() before we get here
-                title_unknown = listing_data.get("title_unknown", False)
+                # title_unknown is set by scrape_listings() for every listing.
+                # Default True (unknown) so any gap in the pipeline is safe.
+                title_unknown = listing_data.get("title_unknown", True)
 
                 # MMR lookup (kept for future use; currently no credentials)
                 mmr_data = get_mmr(

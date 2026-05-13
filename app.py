@@ -64,7 +64,7 @@ def ensure_defaults():
 
 
 def ensure_columns():
-    """Add columns that may be missing from databases created before migrations."""
+    """Add columns missing from databases created before migrations."""
     try:
         inspector = inspect(db.engine)
         lead_cols   = {c["name"] for c in inspector.get_columns("leads")}
@@ -72,15 +72,26 @@ def ensure_columns():
         with db.engine.begin() as conn:
             if "title_unknown" not in lead_cols:
                 conn.execute(text("ALTER TABLE leads ADD COLUMN title_unknown BOOLEAN DEFAULT 0"))
-                # All pre-existing leads have no title data — flag them for
-                # manual review rather than letting them pass as clean.
-                conn.execute(text("UPDATE leads SET title_unknown = 1"))
-                log.info("Schema migration: added title_unknown; flagged all existing leads for title review")
+                log.info("Schema: added title_unknown column to leads")
             if "target_price" not in filter_cols:
                 conn.execute(text("ALTER TABLE search_filters ADD COLUMN target_price INTEGER DEFAULT 0"))
-                log.info("Schema migration: added target_price to search_filters")
+                log.info("Schema: added target_price column to search_filters")
     except Exception as e:
         log.warning(f"Schema migration check failed: {e}")
+
+
+def run_one_time_migrations():
+    """Data migrations that run exactly once, tracked by AppSettings flags."""
+    # Mark every lead that exists before title filtering as unverified.
+    # The flag prevents this from wiping correctly-classified leads on later boots.
+    if not AppSettings.get("migration_title_v1"):
+        try:
+            db.session.execute(text("UPDATE leads SET title_unknown = 1"))
+            db.session.commit()
+            AppSettings.set("migration_title_v1", "done")
+            log.info("Migration title_v1: set title_unknown=1 on all existing leads")
+        except Exception as e:
+            log.warning(f"Migration title_v1 failed: {e}")
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -117,7 +128,7 @@ def leads_page():
     status = request.args.get("status", "")
     tier   = request.args.get("tier", "")
     q = Lead.query.order_by(Lead.found_at.desc())
-    q = q.filter(Lead.title_unknown.is_not(True))
+    q = q.filter(Lead.title_unknown == False)  # only explicitly confirmed clean leads
     if status:
         q = q.filter_by(status=status)
     else:
@@ -230,6 +241,7 @@ with app.app_context():
     db.create_all()
     ensure_defaults()
     ensure_columns()
+    run_one_time_migrations()
 
 if __name__ == "__main__":
     start_scheduler()
