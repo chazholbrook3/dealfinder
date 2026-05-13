@@ -8,6 +8,7 @@ load_dotenv()
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from sqlalchemy import inspect, text
 
 from models import db, SearchFilter, Lead, AppSettings
 from messaging import generate_messages
@@ -61,6 +62,23 @@ def ensure_defaults():
             db.session.add(AppSettings(key=key, value=val))
     db.session.commit()
 
+
+def ensure_columns():
+    """Add columns that may be missing from databases created before migrations."""
+    try:
+        inspector = inspect(db.engine)
+        lead_cols = {c["name"] for c in inspector.get_columns("leads")}
+        filter_cols = {c["name"] for c in inspector.get_columns("search_filters")}
+        with db.engine.begin() as conn:
+            if "title_unknown" not in lead_cols:
+                conn.execute(text("ALTER TABLE leads ADD COLUMN title_unknown BOOLEAN DEFAULT 0"))
+                log.info("Schema migration: added title_unknown to leads")
+            if "target_price" not in filter_cols:
+                conn.execute(text("ALTER TABLE search_filters ADD COLUMN target_price INTEGER DEFAULT 0"))
+                log.info("Schema migration: added target_price to search_filters")
+    except Exception as e:
+        log.warning(f"Schema migration check failed (non-fatal): {e}")
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -79,8 +97,16 @@ def index():
         if job and job.next_run_time:
             next_run = job.next_run_time.strftime("%I:%M %p")
     settings = AppSettings.all_as_dict()
+    title_unknown_leads = (
+        Lead.query
+        .filter_by(title_unknown=True)
+        .filter(Lead.status != "hidden")
+        .order_by(Lead.found_at.desc())
+        .all()
+    )
     return render_template("index.html", leads=leads, filters=filters,
-                           stats=stats, next_run=next_run, settings=settings)
+                           stats=stats, next_run=next_run, settings=settings,
+                           title_unknown_leads=title_unknown_leads)
 
 
 @app.route("/leads")
@@ -97,15 +123,8 @@ def leads_page():
         q = q.filter_by(deal_tier=int(tier))
     leads = q.all()
     hidden_leads = Lead.query.filter_by(status='hidden').order_by(Lead.found_at.desc()).all()
-    title_unknown_leads = (
-        Lead.query
-        .filter_by(title_unknown=True)
-        .filter(Lead.status != 'hidden')
-        .order_by(Lead.found_at.desc())
-        .all()
-    )
     return render_template("leads.html", leads=leads, active_status=status, active_tier=tier,
-                           hidden_leads=hidden_leads, title_unknown_leads=title_unknown_leads)
+                           hidden_leads=hidden_leads)
 
 
 @app.route("/lead/<int:lead_id>")
@@ -207,6 +226,7 @@ def delete_filter(filter_id):
 with app.app_context():
     db.create_all()
     ensure_defaults()
+    ensure_columns()
 
 if __name__ == "__main__":
     start_scheduler()

@@ -119,13 +119,15 @@ def scrape_listings(search_filter, max_results=20):
                     listing[k] = v
 
         title_type = listing.get("title_type", "")
+        log.info(f"  titleType={title_type!r:20s}  {listing.get('title')}")
 
         if title_type in SKIP_TITLE_TYPES:
-            log.info(f"Title filter: skipping {title_type} — {listing.get('title')}")
+            log.info(f"  → SKIPPED (bad title)")
             skipped += 1
             continue
 
         listing["title_unknown"] = (title_type != "Clean Title")
+        log.info(f"  → {'UNKNOWN TITLE' if listing['title_unknown'] else 'CLEAN — keeping'}")
         results.append(listing)
 
     log.info(

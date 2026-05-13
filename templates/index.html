@@ -154,6 +154,52 @@
   </div>
   {% endif %}
 </div>
+<!-- Unknown title section -->
+{% if title_unknown_leads %}
+<details style="margin-top:20px">
+  <summary style="cursor:pointer;font-size:12px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:0.7px;padding:4px 0;user-select:none;list-style:none;display:flex;align-items:center;gap:6px">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="details-chevron"><polyline points="9 18 15 12 9 6"/></svg>
+    Unknown Title ({{ title_unknown_leads|length }}) — verify before reaching out
+  </summary>
+  <div class="card" style="margin-top:10px">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px;padding:10px 12px;background:var(--bg3);border-radius:7px;line-height:1.6">
+      These listings did not have a confirmed "Clean Title" — seller marked it "Not Specified" or the field was missing. Check the KSL listing directly before contacting the seller.
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Vehicle</th>
+            <th>Price</th>
+            <th>Found</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lead in title_unknown_leads %}
+          <tr data-lead-id="{{ lead.id }}">
+            <td>
+              {% if lead.image_url %}
+              <img src="{{ lead.image_url }}" class="pill-img" alt="" onerror="this.style.display='none'"/>
+              {% else %}
+              <div class="pill-img" style="display:flex;align-items:center;justify-content:center;color:var(--text3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17H5a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v6a2 2 0 01-2 2z"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M5 9l2-4h10l2 4"/></svg></div>
+              {% endif %}
+            </td>
+            <td style="max-width:220px">
+              <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text2)">{{ lead.title or 'Unknown' }}</div>
+            </td>
+            <td class="mono text2">{% if lead.price %}${{ "{:,}".format(lead.price) }}{% else %}—{% endif %}</td>
+            <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ (lead.found_at | to_mt).strftime('%b %d %I:%M %p') if lead.found_at else '—' }}</td>
+            <td><a href="/lead/{{ lead.id }}" class="btn btn-sm">View</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</details>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -173,6 +219,13 @@ async function triggerScan(btn) {
     btn.textContent = 'Scan now';
   }
 }
+
+document.querySelectorAll('details').forEach(el => {
+  el.addEventListener('toggle', () => {
+    const ch = el.querySelector('.details-chevron');
+    if (ch) ch.style.transform = el.open ? 'rotate(90deg)' : '';
+  });
+});
 
 async function apiStatus(leadId, status) {
   const r = await fetch(`/api/lead/${leadId}/status`, {
