@@ -150,8 +150,9 @@ def create_filter():
         year_max  = int(request.form.get("year_max")  or 9999),
         price_min = int(request.form.get("price_min") or 0),
         price_max = int(request.form.get("price_max") or 999999),
-        miles_max = int(request.form.get("miles_max") or 999999),
-        zip_code  = request.form.get("zip_code", "84101"),
+        miles_max    = int(request.form.get("miles_max")    or 999999),
+        target_price = int(request.form.get("target_price") or 0),
+        zip_code     = request.form.get("zip_code", "84101"),
         radius_mi = int(request.form.get("radius_mi") or 100),
         active    = True,
     )

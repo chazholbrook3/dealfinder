@@ -64,7 +64,7 @@ def run_scan(app):
                     listing_price = listing_data.get("price", 0),
                     mmr           = mmr_data.get("mmr", 0),
                     settings      = settings,
-                    target_price  = f.price_max,
+                    target_price  = f.target_price,
                 )
 
                 # Skip Tier 3 entirely — not worth pursuing
@@ -97,7 +97,7 @@ def run_scan(app):
                     listing_url    = listing_data.get("listing_url", ""),
                     image_url      = listing_data.get("image_url", ""),
                     description    = listing_data.get("description", ""),
-                    mmr            = f.price_max,
+                    mmr            = f.target_price,
                     mmr_source     = "target_price",
                     deal_tier      = score["tier"],
                     deal_label     = score["label"],
@@ -116,7 +116,7 @@ def run_scan(app):
                     pct_str = f"{score['pct_vs_mmr']:+.1f}%"
                     urgent_body = (
                         f"🚨 URGENT DEAL — {listing_data.get('title', 'Vehicle')}\n"
-                        f"Listed: ${listing_data.get('price', 0):,} | Target: ${f.price_max:,} ({pct_str} vs target)\n"
+                        f"Listed: ${listing_data.get('price', 0):,} | Target: ${f.target_price:,} ({pct_str} vs target)\n"
                         f"CALL NOW: {listing_data.get('listing_url', '')}"
                     )
                     try:
@@ -145,6 +145,6 @@ def run_scan(app):
 
                 db.session.commit()
                 new_count += 1
-                log.info(f"New lead [{score['label'].upper()}]: {listing_data.get('title')} | ${listing_data.get('price',0):,} vs target ${f.price_max:,}")
+                log.info(f"New lead [{score['label'].upper()}]: {listing_data.get('title')} | ${listing_data.get('price',0):,} vs target ${f.target_price:,}")
 
         log.info(f"Scan complete — {new_count} new lead(s)")
