@@ -1,6 +1,11 @@
 """
-scraper.py — scrapes KSL Classifieds by fetching the search page HTML
-and extracting the embedded Next.js JSON payload.
+scraper.py — scrapes KSL Cars (cars.ksl.com) via its Next.js RSC payload.
+
+cars.ksl.com renders full structured listing data server-side at path-based URLs:
+    https://cars.ksl.com/v2/search/make/Toyota/model/Camry/yearFrom/2018/...
+
+The RSC payload (self.__next_f.push blocks) embeds JSON with price, make, model,
+year, mileage, location, image — no JavaScript execution needed.
 """
 
 import os
@@ -8,22 +13,24 @@ import re
 import json
 import logging
 import requests
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-from urllib.parse import urlencode
+import warnings
+warnings.filterwarnings("ignore")
 
 log = logging.getLogger(__name__)
 
-KSL_BASE = "https://classifieds.ksl.com"
+KSL_CARS_BASE = "https://cars.ksl.com"
+KSL_SEARCH_BASE = f"{KSL_CARS_BASE}/v2/search"
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/123.0.0.0 Safari/537.36"
+    ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
     "Accept-Encoding": "gzip, deflate, br",
     "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-    "Cache-Control": "max-age=0",
 }
 
 
@@ -33,146 +40,197 @@ def get_proxies():
     user = os.environ.get("BRIGHTDATA_USER")
     pwd  = os.environ.get("BRIGHTDATA_PASS")
     if all([host, port, user, pwd]):
-        import random; session_id = random.randint(1, 999999); proxy_url = f"http://{user}-session-{session_id}-country-us:{pwd}@{host}:{port}"
+        import random
+        session_id = random.randint(1, 999999)
+        proxy_url = f"http://{user}-session-{session_id}-country-us:{pwd}@{host}:{port}"
         log.info("Using Bright Data residential proxy")
         return {"http": proxy_url, "https": proxy_url}
-    log.warning("No proxy configured")
     return None
 
 
 def build_search_url(f):
-    params = {"category": "cars-trucks"}
-    if f.make:               params["make"]      = f.make
-    if f.model:              params["model"]     = f.model
-    if f.year_min:           params["yearFrom"]  = f.year_min
-    if f.year_max < 9999:    params["yearTo"]    = f.year_max
-    if f.price_min:          params["priceFrom"] = f.price_min
-    if f.price_max < 999999: params["priceTo"]   = f.price_max
-    if f.miles_max < 999999: params["mileageTo"] = f.miles_max
-    if f.zip_code:           params["zip"]       = f.zip_code
-    if f.radius_mi:          params["miles"]     = f.radius_mi
-    return f"{KSL_BASE}/search/?{urlencode(params)}"
+    """Build a cars.ksl.com /v2/search path-based URL from a SearchFilter."""
+    parts = [KSL_SEARCH_BASE]
+
+    if f.make:
+        parts += ["make", f.make]
+    if f.model:
+        parts += ["model", f.model]
+    if f.year_min and f.year_min > 0:
+        parts += ["yearFrom", str(f.year_min)]
+    if f.year_max and f.year_max < 9999:
+        parts += ["yearTo", str(f.year_max)]
+    if f.price_min and f.price_min > 0:
+        parts += ["priceFrom", str(f.price_min)]
+    if f.price_max and f.price_max < 999999:
+        parts += ["priceTo", str(f.price_max)]
+    if f.miles_max and f.miles_max < 999999:
+        parts += ["mileageTo", str(f.miles_max)]
+    if f.zip_code:
+        parts += ["zip", str(f.zip_code)]
+        if f.radius_mi:
+            parts += ["miles", str(f.radius_mi)]
+
+    return "/".join(parts)
 
 
 def scrape_listings(search_filter, max_results=20):
     url = build_search_url(search_filter)
-    log.info(f"Scraping KSL: {url}")
+    log.info(f"Scraping KSL Cars: {url}")
 
     try:
         resp = requests.get(
             url,
             headers=HEADERS,
             proxies=get_proxies(),
-            timeout=20,
+            timeout=25,
+            allow_redirects=True,
             verify=False,
         )
         resp.raise_for_status()
     except requests.RequestException as e:
-        log.error(f"KSL fetch failed: {e}")
+        log.error(f"KSL Cars fetch failed: {e}")
         return []
 
-    listings = _extract_from_html(resp.text, max_results)
+    listings = _extract_from_rsc(resp.text, max_results)
     log.info(f"Found {len(listings)} listings for '{search_filter.name}'")
     return listings
 
 
-def _extract_from_html(html, max_results=20):
-    listings = []
-    match = re.search(r'"results":\[\[(.*?)\]\]', html, re.DOTALL)
-    if not match:
-        log.warning("Could not find results in page")
+def _extract_from_rsc(html, max_results=20):
+    """Parse listings from the Next.js RSC payload embedded in the HTML."""
+    blocks = re.findall(r'self\.__next_f\.push\(\[1,"(.*?)"\]\)', html, re.DOTALL)
+    if not blocks:
+        log.warning("No RSC blocks found in page")
         return []
-    raw = match.group(1)
-    try:
-        items = json.loads(f"[{raw}]")
-    except Exception as e:
-        log.error(f"Failed to parse listing JSON: {e}")
-        return []
-    for item in items[:max_results]:
+
+    for block in blocks:
         try:
-            listing = _parse_item(item)
-            if listing:
-                listings.append(listing)
+            decoded = json.loads(f'"{block}"')
+        except Exception:
+            decoded = block
+
+        if '"initialState"' not in decoded or '"results"' not in decoded:
+            continue
+
+        match = re.search(r'"results":\[\[(.*?)\]\]', decoded, re.DOTALL)
+        if not match:
+            continue
+
+        try:
+            items = json.loads(f"[{match.group(1)}]")
         except Exception as e:
-            log.warning(f"Skipping item: {e}")
-    return listings
+            log.error(f"Failed to parse RSC results JSON: {e}")
+            return []
+
+        listings = []
+        for item in items[:max_results]:
+            try:
+                listing = _parse_item(item)
+                if listing:
+                    listings.append(listing)
+            except Exception as e:
+                log.warning(f"Skipping item {item.get('id')}: {e}")
+        return listings
+
+    log.warning("RSC results block not found in page")
+    return []
 
 
 def _parse_item(item):
     listing_id = str(item.get("id") or "")
     if not listing_id:
         return None
-    price_raw = item.get("price") or 0
-    try:
-        price = float(str(price_raw).replace(",", "").replace("$", ""))
-    except (ValueError, TypeError):
-        price = 0.0
+
     location = item.get("location") or {}
     city  = location.get("city", "") if isinstance(location, dict) else ""
     state = location.get("state", "") if isinstance(location, dict) else ""
-    title = item.get("title") or ""
-    year, make, model = _parse_title(title)
+
     image_url = ""
     primary = item.get("primaryImage")
     if isinstance(primary, dict):
         image_url = primary.get("url", "")
-    elif isinstance(primary, str):
-        image_url = primary
+
     return {
         "listing_id":   listing_id,
         "ksl_id":       listing_id,
-        "title":        title,
-        "price":        price,
-        "year":         year,
-        "make":         make,
-        "model":        model,
-        "mileage":      0,
+        "title":        item.get("title", ""),
+        "price":        float(item.get("price") or 0),
+        "year":         int(item.get("makeYear") or 0),
+        "make":         item.get("make", ""),
+        "model":        item.get("model", ""),
+        "mileage":      int(item.get("mileage") or 0),
         "city":         city,
         "state":        state,
         "location":     f"{city}, {state}".strip(", "),
         "image_url":    image_url,
-        "listing_url":  f"{KSL_BASE}/listing/{listing_id}",
-        "url":          f"{KSL_BASE}/listing/{listing_id}",
-        "description":  item.get("description", ""),
-        "seller_name":  "",
+        "listing_url":  f"{KSL_CARS_BASE}/listing/{listing_id}",
+        "url":          f"{KSL_CARS_BASE}/listing/{listing_id}",
+        "description":  "",
+        "seller_name":  item.get("dealerName", ""),
         "seller_phone": "",
         "seller_type":  item.get("sellerType", ""),
+        "vin":          item.get("vin", ""),
+        "trim":         item.get("trim", ""),
     }
 
 
 def fetch_listing_detail(url):
+    """Fetch the detail page and extract phone, description, and mileage."""
     try:
-        resp = requests.get(url, headers=HEADERS, proxies=get_proxies(), timeout=20, verify=False)
+        resp = requests.get(
+            url,
+            headers=HEADERS,
+            proxies=get_proxies(),
+            timeout=20,
+            allow_redirects=True,
+            verify=False,
+        )
         resp.raise_for_status()
-        match = re.search(r'"description"\s*:\s*"(.*?)"(?=[,}])', resp.text)
-        description = match.group(1) if match else ""
-        match2 = re.search(r'"mileage"\s*:\s*(\d+)', resp.text)
-        mileage = int(match2.group(1)) if match2 else 0
-        return {"description": description, "mileage": mileage}
-    except Exception as e:
+    except requests.RequestException as e:
         log.warning(f"Detail fetch failed for {url}: {e}")
         return {}
 
+    return _extract_detail_from_rsc(resp.text)
 
-def _parse_title(title):
-    year_match = re.search(r"\b(19|20)\d{2}\b", str(title))
-    year = int(year_match.group()) if year_match else 0
-    makes = [
-        "Honda", "Toyota", "Ford", "Chevrolet", "Chevy", "Dodge", "RAM",
-        "Nissan", "Hyundai", "Kia", "Subaru", "Mazda", "Jeep", "GMC",
-        "Volkswagen", "BMW", "Mercedes", "Audi", "Lexus", "Acura",
-        "Infiniti", "Cadillac", "Buick", "Lincoln", "Volvo", "Tesla",
-        "Mitsubishi", "Chrysler", "Ram", "Pontiac", "Saturn", "Isuzu",
-    ]
-    make = ""
-    for m in makes:
-        if m.lower() in str(title).lower():
-            make = m
-            break
-    model = ""
-    if make:
-        idx = title.lower().find(make.lower())
-        after = title[idx + len(make):].strip()
-        words = after.split()
-        model = words[0] if words else ""
-    return year, make, model
+
+def _extract_detail_from_rsc(html):
+    blocks = re.findall(r'self\.__next_f\.push\(\[1,"(.*?)"\]\)', html, re.DOTALL)
+
+    for block in blocks:
+        try:
+            decoded = json.loads(f'"{block}"')
+        except Exception:
+            decoded = block
+
+        if '"listingType":"CAR"' not in decoded:
+            continue
+
+        result = {}
+
+        # Phone number — appears as bare number string in the RSC
+        phone_match = re.search(r'"phone[^"]*":\s*"(\d{7,15})"', decoded)
+        if phone_match:
+            result["seller_phone"] = phone_match.group(1)
+
+        # Description
+        desc_match = re.search(r'"description":\s*"((?:[^"\\]|\\.)*)"', decoded)
+        if desc_match:
+            desc = desc_match.group(1).replace("\\n", "\n").replace('\\"', '"')
+            if len(desc) > 5:
+                result["description"] = desc
+
+        # Mileage (more accurate on detail page)
+        mile_match = re.search(r'"mileage":\s*(\d+)', decoded)
+        if mile_match:
+            result["mileage"] = int(mile_match.group(1))
+
+        # Seller name from detail
+        name_match = re.search(r'"contactName":\s*"([^"]+)"', decoded)
+        if name_match:
+            result["seller_name"] = name_match.group(1)
+
+        if result:
+            return result
+
+    return {}
