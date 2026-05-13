@@ -7,3 +7,4 @@ anthropic==0.28.0
 twilio==9.2.3
 python-dotenv==1.0.1
 gunicorn==22.0.0
+tzdata

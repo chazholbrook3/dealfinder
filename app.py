@@ -1,5 +1,6 @@
 import os
 import logging
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,6 +21,16 @@ app.config["SQLALCHEMY_DATABASE_URI"]     = os.environ.get("DATABASE_URL", "sqli
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
+
+_MT  = ZoneInfo("America/Denver")
+_UTC = ZoneInfo("UTC")
+
+@app.template_filter("to_mt")
+def to_mt(dt):
+    """Convert a naive UTC datetime to Mountain Time for display."""
+    if not dt:
+        return None
+    return dt.replace(tzinfo=_UTC).astimezone(_MT)
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 

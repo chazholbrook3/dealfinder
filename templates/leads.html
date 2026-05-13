@@ -56,7 +56,7 @@
           <td class="mono text2">{% if lead.mileage %}{{ "{:,}".format(lead.mileage) }}{% else %}—{% endif %}</td>
           <td class="text2" style="white-space:nowrap">{{ lead.location or '—' }}</td>
           <td class="text2">{{ lead.seller_name or '—' }}</td>
-          <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ lead.found_at.strftime('%b %d') if lead.found_at else '—' }}</td>
+          <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ (lead.found_at | to_mt).strftime('%b %d') if lead.found_at else '—' }}</td>
           <td><span class="badge badge-{{ lead.status }} lead-badge">{{ lead.status }}</span></td>
           <td style="white-space:nowrap">
             <button
@@ -131,7 +131,7 @@
               <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text2)">{{ lead.title or 'Unknown' }}</div>
             </td>
             <td class="mono text2">{% if lead.price %}${{ "{:,}".format(lead.price) }}{% else %}—{% endif %}</td>
-            <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ lead.found_at.strftime('%b %d') if lead.found_at else '—' }}</td>
+            <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ (lead.found_at | to_mt).strftime('%b %d') if lead.found_at else '—' }}</td>
             <td style="white-space:nowrap">
               <button class="btn btn-sm" data-id="{{ lead.id }}" onclick="restoreLead(this)">Restore</button>
               <a href="/lead/{{ lead.id }}" class="btn btn-sm" style="margin-left:3px">View</a>
