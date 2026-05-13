@@ -120,8 +120,27 @@
             {% endif %}
           </td>
           <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ lead.found_at.strftime('%b %d %I:%M %p') if lead.found_at else '—' }}</td>
-          <td><span class="badge badge-{{ lead.status }}">{{ lead.status }}</span></td>
-          <td><a href="/lead/{{ lead.id }}" class="btn btn-sm">View</a></td>
+          <td><span class="badge badge-{{ lead.status }} lead-badge">{{ lead.status }}</span></td>
+          <td style="white-space:nowrap">
+            <button
+              class="btn btn-sm"
+              data-id="{{ lead.id }}"
+              data-favorited="{{ 'true' if lead.status == 'favorited' else 'false' }}"
+              onclick="toggleFavorite(this)"
+              title="{% if lead.status == 'favorited' %}Remove from favorites{% else %}Add to favorites{% endif %}"
+              style="padding:4px 8px;{% if lead.status == 'favorited' %}color:var(--amber);border-color:rgba(245,166,35,0.3);{% else %}color:var(--text2);{% endif %}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="{% if lead.status == 'favorited' %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </button>
+            <button
+              class="btn btn-sm"
+              data-id="{{ lead.id }}"
+              onclick="hideLead(this)"
+              title="Hide lead"
+              style="padding:4px 8px;color:var(--text2);margin-left:3px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 104.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0112 5c7 0 10 7 10 7a13.16 13.16 0 01-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 002 12s3 7 10 7a9.74 9.74 0 005.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+            </button>
+            <a href="/lead/{{ lead.id }}" class="btn btn-sm" style="margin-left:3px">View</a>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -153,6 +172,55 @@ async function triggerScan(btn) {
     btn.disabled = false;
     btn.textContent = 'Scan now';
   }
+}
+
+async function apiStatus(leadId, status) {
+  const r = await fetch(`/api/lead/${leadId}/status`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status})
+  });
+  return r.ok;
+}
+
+function fadeRemove(row) {
+  row.style.transition = 'opacity 0.2s';
+  row.style.opacity = '0';
+  setTimeout(() => row.remove(), 220);
+}
+
+async function toggleFavorite(btn) {
+  const leadId = btn.dataset.id;
+  const isFav  = btn.dataset.favorited === 'true';
+  const next   = isFav ? 'new' : 'favorited';
+  const ok = await apiStatus(leadId, next);
+  if (!ok) { toast('Error updating lead'); return; }
+  btn.dataset.favorited = String(!isFav);
+  const row   = btn.closest('tr');
+  const svg   = btn.querySelector('svg');
+  const badge = row.querySelector('.lead-badge');
+  if (!isFav) {
+    btn.style.color       = 'var(--amber)';
+    btn.style.borderColor = 'rgba(245,166,35,0.3)';
+    btn.title             = 'Remove from favorites';
+    svg.setAttribute('fill', 'currentColor');
+    if (badge) { badge.className = 'badge badge-favorited lead-badge'; badge.textContent = 'favorited'; }
+    toast('Added to favorites');
+  } else {
+    btn.style.color       = 'var(--text2)';
+    btn.style.borderColor = '';
+    btn.title             = 'Add to favorites';
+    svg.setAttribute('fill', 'none');
+    if (badge) { badge.className = 'badge badge-new lead-badge'; badge.textContent = 'new'; }
+    toast('Removed from favorites');
+  }
+}
+
+async function hideLead(btn) {
+  const ok = await apiStatus(btn.dataset.id, 'hidden');
+  if (!ok) { toast('Error hiding lead'); return; }
+  fadeRemove(btn.closest('tr'));
+  toast('Lead hidden');
 }
 
 async function saveThresholds() {
