@@ -27,7 +27,7 @@ def run_scan(app):
             "tier2_pct": float(AppSettings.get("tier2_pct", "10")),
         }
 
-        log.info(f"Scan started — {len(filters)} filter(s) | Tier1≤{settings['tier1_pct']}% Tier2≤{settings['tier2_pct']}%")
+        log.info(f"Scan started — {len(filters)} filter(s) | scoring by filter target price")
         new_count = 0
 
         for f in filters:
@@ -51,7 +51,7 @@ def run_scan(app):
                     detail = fetch_listing_detail(listing_data["listing_url"])
                     listing_data.update({k: v for k, v in detail.items() if v})
 
-                # MMR lookup
+                # MMR lookup (kept for future use; currently no credentials)
                 mmr_data = get_mmr(
                     year    = listing_data.get("year", 0),
                     make    = listing_data.get("make", ""),
@@ -59,16 +59,17 @@ def run_scan(app):
                     mileage = listing_data.get("mileage", 0),
                 )
 
-                # Deal scoring
+                # Deal scoring — uses filter's price_max as the target price
                 score = score_deal(
                     listing_price = listing_data.get("price", 0),
                     mmr           = mmr_data.get("mmr", 0),
                     settings      = settings,
+                    target_price  = f.price_max,
                 )
 
                 # Skip Tier 3 entirely — not worth pursuing
                 if score["tier"] == 3:
-                    log.info(f"Skipping Tier 3 listing: {listing_data.get('title')} ({score['pct_vs_mmr']:+.1f}% vs MMR)")
+                    log.info(f"Skipping Tier 3 listing: {listing_data.get('title')} ({score['pct_vs_mmr']:+.1f}% vs target)")
                     continue
 
                 # Generate AI messages for Tier 1 & 2
@@ -96,8 +97,8 @@ def run_scan(app):
                     listing_url    = listing_data.get("listing_url", ""),
                     image_url      = listing_data.get("image_url", ""),
                     description    = listing_data.get("description", ""),
-                    mmr            = mmr_data.get("mmr", 0),
-                    mmr_source     = mmr_data.get("source", ""),
+                    mmr            = f.price_max,
+                    mmr_source     = "target_price",
                     deal_tier      = score["tier"],
                     deal_label     = score["label"],
                     pct_vs_mmr     = score["pct_vs_mmr"],
@@ -115,7 +116,7 @@ def run_scan(app):
                     pct_str = f"{score['pct_vs_mmr']:+.1f}%"
                     urgent_body = (
                         f"🚨 URGENT DEAL — {listing_data.get('title', 'Vehicle')}\n"
-                        f"Listed: ${listing_data.get('price', 0):,} | MMR: ${mmr_data.get('mmr', 0):,} ({pct_str} vs MMR)\n"
+                        f"Listed: ${listing_data.get('price', 0):,} | Target: ${f.price_max:,} ({pct_str} vs target)\n"
                         f"CALL NOW: {listing_data.get('listing_url', '')}"
                     )
                     try:
@@ -144,6 +145,6 @@ def run_scan(app):
 
                 db.session.commit()
                 new_count += 1
-                log.info(f"New lead [{score['label'].upper()}]: {listing_data.get('title')} | ${listing_data.get('price',0):,} vs MMR ${mmr_data.get('mmr',0):,}")
+                log.info(f"New lead [{score['label'].upper()}]: {listing_data.get('title')} | ${listing_data.get('price',0):,} vs target ${f.price_max:,}")
 
         log.info(f"Scan complete — {new_count} new lead(s)")

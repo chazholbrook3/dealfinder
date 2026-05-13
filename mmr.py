@@ -128,39 +128,35 @@ def get_mmr(year: int, make: str, model: str, mileage: int = 0) -> dict:
         return {"mmr": 0, "source": "unavailable", "above": 0, "below": 0}
 
 
-def score_deal(listing_price: int, mmr: int, settings: dict) -> dict:
+def score_deal(listing_price: int, mmr: int, settings: dict, target_price: int = 0) -> dict:
     """
-    Score a listing against MMR and return its tier.
+    Score a listing against the filter's target price and return its tier.
 
     Tiers:
-        1 = URGENT  — listed significantly below MMR, broker should call NOW
-        2 = OPPORTUNITY — listed at or slightly above MMR, AI outreach worth it
-        3 = SKIP    — listed too far above MMR, not worth pursuing
+        1 = URGENT      — price <= target_price
+        2 = OPPORTUNITY — price <= target_price * 1.10
+        3 = SKIP        — price > target_price * 1.10
 
-    settings keys:
-        tier1_pct  — % below MMR for Tier 1 (e.g. 0 = at MMR or below)
-        tier2_pct  — % above MMR still worth outreach (e.g. 10 = up to 10% above)
+    target_price comes from SearchFilter.price_max.
+    mmr and settings are accepted for signature compatibility but unused.
 
     Returns:
         {
             "tier":       int,
             "label":      str,
-            "pct_vs_mmr": float,  # negative = below MMR
-            "diff":       int,    # $ difference vs MMR
+            "pct_vs_mmr": float,  # % above/below target_price (negative = below)
+            "diff":       int,    # $ difference vs target_price
         }
     """
-    if not mmr or not listing_price:
+    if not target_price or not listing_price:
         return {"tier": 2, "label": "unknown", "pct_vs_mmr": 0, "diff": 0}
 
-    pct = ((listing_price - mmr) / mmr) * 100  # negative = below MMR
-    diff = listing_price - mmr
+    pct  = ((listing_price - target_price) / target_price) * 100
+    diff = listing_price - target_price
 
-    tier1_threshold = float(settings.get("tier1_pct", 0))    # at or below MMR
-    tier2_threshold = float(settings.get("tier2_pct", 10))   # up to 10% above
-
-    if pct <= tier1_threshold:
+    if listing_price <= target_price:
         tier, label = 1, "urgent"
-    elif pct <= tier2_threshold:
+    elif listing_price <= target_price * 1.10:
         tier, label = 2, "opportunity"
     else:
         tier, label = 3, "skip"
