@@ -21,6 +21,9 @@ log = logging.getLogger(__name__)
 KSL_CARS_BASE = "https://cars.ksl.com"
 KSL_SEARCH_BASE = f"{KSL_CARS_BASE}/v2/search"
 
+# Listings with these title types are never saved to the database
+SKIP_TITLE_TYPES = {"Salvage Title", "Rebuilt Title", "Lemon Law"}
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -75,6 +78,17 @@ def build_search_url(f):
 
 
 def scrape_listings(search_filter, max_results=20):
+    """
+    Fetch search results, enrich each listing with its detail page, and apply
+    title-type filtering before returning.
+
+    Returns a list of listing dicts.  Each dict has:
+        title_type    – raw string from KSL ("Clean Title", "Not Specified", …)
+        title_unknown – True when title_type is missing or not "Clean Title"
+
+    Listings with SKIP_TITLE_TYPES (Salvage, Rebuilt, Lemon Law) are dropped
+    and never returned.
+    """
     url = build_search_url(search_filter)
     log.info(f"Scraping KSL Cars: {url}")
 
@@ -92,9 +106,33 @@ def scrape_listings(search_filter, max_results=20):
         log.error(f"KSL Cars fetch failed: {e}")
         return []
 
-    listings = _extract_from_rsc(resp.text, max_results)
-    log.info(f"Found {len(listings)} listings for '{search_filter.name}'")
-    return listings
+    raw = _extract_from_rsc(resp.text, max_results)
+    results = []
+    skipped = 0
+
+    for listing in raw:
+        # Enrich with detail-page data (phone, mileage, seller name, titleType)
+        if listing.get("listing_url"):
+            detail = fetch_listing_detail(listing["listing_url"])
+            for k, v in detail.items():
+                if v:                        # never overwrite with empty/None
+                    listing[k] = v
+
+        title_type = listing.get("title_type", "")
+
+        if title_type in SKIP_TITLE_TYPES:
+            log.info(f"Title filter: skipping {title_type} — {listing.get('title')}")
+            skipped += 1
+            continue
+
+        listing["title_unknown"] = (title_type != "Clean Title")
+        results.append(listing)
+
+    log.info(
+        f"'{search_filter.name}': {len(results)} listings kept"
+        + (f", {skipped} skipped (bad title)" if skipped else "")
+    )
+    return results
 
 
 def _extract_from_rsc(html, max_results=20):

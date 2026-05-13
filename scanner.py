@@ -7,13 +7,11 @@ import os
 from datetime import datetime
 
 from models import db, SearchFilter, Lead, AppSettings
-from scraper import scrape_listings, fetch_listing_detail
+from scraper import scrape_listings
 from messaging import generate_messages, send_sms_alert
 from mmr import get_mmr, score_deal
 
 log = logging.getLogger(__name__)
-
-_SKIP_TITLE_TYPES = {"Salvage Title", "Rebuilt Title", "Lemon Law"}
 
 
 def run_scan(app):
@@ -48,17 +46,9 @@ def run_scan(app):
                 if Lead.query.filter_by(ksl_id=ksl_id).first():
                     continue
 
-                # Fetch detail page
-                if listing_data.get("listing_url"):
-                    detail = fetch_listing_detail(listing_data["listing_url"])
-                    listing_data.update({k: v for k, v in detail.items() if v})
-
-                # Title type filter
-                title_type = listing_data.get("title_type", "")
-                if title_type in _SKIP_TITLE_TYPES:
-                    log.info(f"Skipping {title_type}: {listing_data.get('title')}")
-                    continue
-                title_unknown = (title_type != "Clean Title")
+                # title_unknown and detail fields (phone, mileage, etc.) are
+                # already set by scrape_listings() before we get here
+                title_unknown = listing_data.get("title_unknown", False)
 
                 # MMR lookup (kept for future use; currently no credentials)
                 mmr_data = get_mmr(

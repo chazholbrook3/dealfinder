@@ -88,7 +88,7 @@ def leads_page():
     status = request.args.get("status", "")
     tier   = request.args.get("tier", "")
     q = Lead.query.order_by(Lead.found_at.desc())
-    q = q.filter(Lead.title_unknown.isnot(True))
+    q = q.filter(Lead.title_unknown.is_not(True))
     if status:
         q = q.filter_by(status=status)
     else:
