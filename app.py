@@ -77,10 +77,15 @@ def leads_page():
     status = request.args.get("status", "")
     tier   = request.args.get("tier", "")
     q = Lead.query.order_by(Lead.found_at.desc())
-    if status: q = q.filter_by(status=status)
-    if tier:   q = q.filter_by(deal_tier=int(tier))
+    if status:
+        q = q.filter_by(status=status)
+    else:
+        q = q.filter(Lead.status != 'hidden')
+    if tier:
+        q = q.filter_by(deal_tier=int(tier))
     leads = q.all()
-    return render_template("leads.html", leads=leads, active_status=status, active_tier=tier)
+    hidden_leads = Lead.query.filter_by(status='hidden').order_by(Lead.found_at.desc()).all()
+    return render_template("leads.html", leads=leads, active_status=status, active_tier=tier, hidden_leads=hidden_leads)
 
 
 @app.route("/lead/<int:lead_id>")
