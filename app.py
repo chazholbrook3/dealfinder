@@ -67,17 +67,20 @@ def ensure_columns():
     """Add columns that may be missing from databases created before migrations."""
     try:
         inspector = inspect(db.engine)
-        lead_cols = {c["name"] for c in inspector.get_columns("leads")}
+        lead_cols   = {c["name"] for c in inspector.get_columns("leads")}
         filter_cols = {c["name"] for c in inspector.get_columns("search_filters")}
         with db.engine.begin() as conn:
             if "title_unknown" not in lead_cols:
                 conn.execute(text("ALTER TABLE leads ADD COLUMN title_unknown BOOLEAN DEFAULT 0"))
-                log.info("Schema migration: added title_unknown to leads")
+                # All pre-existing leads have no title data — flag them for
+                # manual review rather than letting them pass as clean.
+                conn.execute(text("UPDATE leads SET title_unknown = 1"))
+                log.info("Schema migration: added title_unknown; flagged all existing leads for title review")
             if "target_price" not in filter_cols:
                 conn.execute(text("ALTER TABLE search_filters ADD COLUMN target_price INTEGER DEFAULT 0"))
                 log.info("Schema migration: added target_price to search_filters")
     except Exception as e:
-        log.warning(f"Schema migration check failed (non-fatal): {e}")
+        log.warning(f"Schema migration check failed: {e}")
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
