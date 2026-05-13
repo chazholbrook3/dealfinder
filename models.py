@@ -78,6 +78,7 @@ class Lead(db.Model):
     status         = db.Column(db.String(30), default="new")
     notes          = db.Column(db.Text, default="")
     sms_sent       = db.Column(db.Boolean, default=False)
+    title_unknown  = db.Column(db.Boolean, default=False)
     found_at       = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):

@@ -13,6 +13,8 @@ from mmr import get_mmr, score_deal
 
 log = logging.getLogger(__name__)
 
+_SKIP_TITLE_TYPES = {"Salvage Title", "Rebuilt Title", "Lemon Law"}
+
 
 def run_scan(app):
     with app.app_context():
@@ -50,6 +52,13 @@ def run_scan(app):
                 if listing_data.get("listing_url"):
                     detail = fetch_listing_detail(listing_data["listing_url"])
                     listing_data.update({k: v for k, v in detail.items() if v})
+
+                # Title type filter
+                title_type = listing_data.get("title_type", "")
+                if title_type in _SKIP_TITLE_TYPES:
+                    log.info(f"Skipping {title_type}: {listing_data.get('title')}")
+                    continue
+                title_unknown = (title_type != "Clean Title")
 
                 # MMR lookup (kept for future use; currently no credentials)
                 mmr_data = get_mmr(
@@ -106,6 +115,7 @@ def run_scan(app):
                     ai_message_fb  = messages.get("fb", ""),
                     ai_message_sms = messages.get("sms", ""),
                     status         = "new",
+                    title_unknown  = title_unknown,
                     found_at       = datetime.utcnow(),
                 )
                 db.session.add(lead)

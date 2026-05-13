@@ -230,6 +230,11 @@ def _extract_detail_from_rsc(html):
         if name_match:
             result["seller_name"] = name_match.group(1)
 
+        # Title type (Clean Title, Salvage Title, Rebuilt Title, Not Specified, etc.)
+        title_match = re.search(r'"titleType":\s*"([^"]+)"', decoded)
+        if title_match:
+            result["title_type"] = title_match.group(1)
+
         if result:
             return result
 

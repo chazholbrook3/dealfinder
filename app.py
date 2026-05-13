@@ -88,6 +88,7 @@ def leads_page():
     status = request.args.get("status", "")
     tier   = request.args.get("tier", "")
     q = Lead.query.order_by(Lead.found_at.desc())
+    q = q.filter(Lead.title_unknown.isnot(True))
     if status:
         q = q.filter_by(status=status)
     else:
@@ -96,7 +97,15 @@ def leads_page():
         q = q.filter_by(deal_tier=int(tier))
     leads = q.all()
     hidden_leads = Lead.query.filter_by(status='hidden').order_by(Lead.found_at.desc()).all()
-    return render_template("leads.html", leads=leads, active_status=status, active_tier=tier, hidden_leads=hidden_leads)
+    title_unknown_leads = (
+        Lead.query
+        .filter_by(title_unknown=True)
+        .filter(Lead.status != 'hidden')
+        .order_by(Lead.found_at.desc())
+        .all()
+    )
+    return render_template("leads.html", leads=leads, active_status=status, active_tier=tier,
+                           hidden_leads=hidden_leads, title_unknown_leads=title_unknown_leads)
 
 
 @app.route("/lead/<int:lead_id>")
