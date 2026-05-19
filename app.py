@@ -34,6 +34,13 @@ def to_mt(dt):
         return None
     return dt.replace(tzinfo=_UTC).astimezone(_MT)
 
+@app.template_filter("age_days")
+def age_days(dt):
+    """Return number of whole days since a naive UTC datetime."""
+    if not dt:
+        return None
+    return (datetime.utcnow() - dt).days
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 scheduler = BackgroundScheduler(daemon=True)

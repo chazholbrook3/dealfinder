@@ -133,7 +133,14 @@
               <span class="badge" style="background:var(--amber-bg);color:var(--amber)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14"/></svg> Opportunity</span>
             {% endif %}
           </td>
-          <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ (lead.found_at | to_mt).strftime('%b %d %I:%M %p') if lead.found_at else '—' }}</td>
+          <td class="text2 mono" style="font-size:11px;white-space:nowrap">
+            {{ (lead.found_at | to_mt).strftime('%b %d %I:%M %p') if lead.found_at else '—' }}
+            {% set days = lead.found_at | age_days %}
+            {% if days is not none %}
+              {% if days < 2 %}<span class="badge badge-new" style="font-size:10px;padding:1px 5px;margin-left:4px">New</span>
+              {% else %}<span style="color:var(--text3)"> · {{ days }}d</span>{% endif %}
+            {% endif %}
+          </td>
           <td><span class="badge badge-{{ lead.status }} lead-badge">{{ lead.status }}</span></td>
           <td style="white-space:nowrap">
             <button
@@ -224,7 +231,14 @@
               <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text2)">{{ lead.title or 'Unknown' }}</div>
             </td>
             <td class="mono text2">{% if lead.price %}${{ "{:,}".format(lead.price) }}{% else %}—{% endif %}</td>
-            <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ (lead.found_at | to_mt).strftime('%b %d %I:%M %p') if lead.found_at else '—' }}</td>
+            <td class="text2 mono" style="font-size:11px;white-space:nowrap">
+              {{ (lead.found_at | to_mt).strftime('%b %d %I:%M %p') if lead.found_at else '—' }}
+              {% set days = lead.found_at | age_days %}
+              {% if days is not none %}
+                {% if days < 2 %}<span class="badge badge-new" style="font-size:10px;padding:1px 5px;margin-left:4px">New</span>
+                {% else %}<span style="color:var(--text3)"> · {{ days }}d</span>{% endif %}
+              {% endif %}
+            </td>
             <td style="white-space:nowrap"><a href="/lead/{{ lead.id }}" class="btn btn-sm">View</a>{% if lead.listing_url %}<a href="{{ lead.listing_url }}" target="_blank" rel="noopener" class="btn btn-sm" style="margin-left:3px">KSL ↗</a>{% endif %}</td>
           </tr>
           {% endfor %}

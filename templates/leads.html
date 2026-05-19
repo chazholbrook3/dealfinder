@@ -56,7 +56,14 @@
           <td class="mono text2">{% if lead.mileage %}{{ "{:,}".format(lead.mileage) }}{% else %}—{% endif %}</td>
           <td class="text2" style="white-space:nowrap">{{ lead.location or '—' }}</td>
           <td class="text2">{{ lead.seller_name or '—' }}</td>
-          <td class="text2 mono" style="font-size:11px;white-space:nowrap">{{ (lead.found_at | to_mt).strftime('%b %d') if lead.found_at else '—' }}</td>
+          <td class="text2 mono" style="font-size:11px;white-space:nowrap">
+            {{ (lead.found_at | to_mt).strftime('%b %d') if lead.found_at else '—' }}
+            {% set days = lead.found_at | age_days %}
+            {% if days is not none %}
+              {% if days < 2 %}<span class="badge badge-new" style="font-size:10px;padding:1px 5px;margin-left:4px">New</span>
+              {% else %}<span style="color:var(--text3)"> · {{ days }}d</span>{% endif %}
+            {% endif %}
+          </td>
           <td><span class="badge badge-{{ lead.status }} lead-badge">{{ lead.status }}</span></td>
           <td style="white-space:nowrap">
             <button
