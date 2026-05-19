@@ -160,6 +160,35 @@ def leads_page():
                            hidden_leads=hidden_leads)
 
 
+@app.route("/leads/export.csv")
+def export_leads_csv():
+    import csv, io
+    from flask import Response
+    leads = (Lead.query
+             .filter(Lead.title_unknown == False)
+             .filter(Lead.status != "hidden")
+             .order_by(Lead.found_at.desc())
+             .all())
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Vehicle", "Price", "Tier", "Status", "Location", "Mileage", "Found"])
+    for l in leads:
+        w.writerow([
+            l.title or "",
+            l.price or "",
+            l.deal_label or "",
+            l.status or "",
+            l.location or "",
+            l.mileage or "",
+            l.found_at.strftime("%Y-%m-%d %H:%M") if l.found_at else "",
+        ])
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=leads.csv"},
+    )
+
+
 @app.route("/lead/<int:lead_id>")
 def lead_detail(lead_id):
     lead = Lead.query.get_or_404(lead_id)
