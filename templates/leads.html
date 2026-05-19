@@ -77,6 +77,7 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 104.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0112 5c7 0 10 7 10 7a13.16 13.16 0 01-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 002 12s3 7 10 7a9.74 9.74 0 005.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
             </button>
             <a href="/lead/{{ lead.id }}" class="btn btn-sm" style="margin-left:3px">View</a>
+            {% if lead.listing_url %}<a href="{{ lead.listing_url }}" target="_blank" rel="noopener" class="btn btn-sm" style="margin-left:3px">KSL ↗</a>{% endif %}
           </td>
         </tr>
         {% endfor %}
