@@ -149,8 +149,27 @@
   {% else %}
   <div class="empty">
     <div class="empty-icon"></div>
+    {% if filters %}
+    <div style="margin-bottom:14px;color:var(--text2)">No leads yet. Active searches:</div>
+    <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:480px;margin:0 auto 16px">
+      {% for f in filters %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:13px;gap:12px">
+        <div style="font-weight:600;color:var(--text1)">{{ f.name }}</div>
+        <div style="color:var(--text2);text-align:right;line-height:1.5">
+          {{ f.make }} {{ f.model }}{% if f.year_min or f.year_max != 9999 %} &middot; {{ f.year_min or '?' }}–{{ f.year_max if f.year_max != 9999 else '?' }}{% endif %}{% if f.target_price %} &middot; target ${{ "{:,}".format(f.target_price) }}{% endif %}
+          {% if not f.active %}<span style="color:var(--text3);font-size:11px"> (paused)</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <button class="btn btn-primary" onclick="triggerScan(this)" style="display:inline-flex;align-items:center;gap:6px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Scan now
+    </button>
+    {% else %}
     <div>No leads yet. Add a search filter and run a scan.</div>
-    <br><a href="/filters" class="btn btn-primary" style="display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Add search filter</a>
+    <br><a href="/filters" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Add search filter</a>
+    {% endif %}
   </div>
   {% endif %}
 </div>

@@ -122,15 +122,8 @@ def run_scan(app):
         log.info(f"Scan complete — {new_count} new lead(s) ({urgent_count} urgent, {opp_count} opportunities)")
 
         # Send one summary SMS if any new leads were found
-        if new_count > 0:
-            app_url = os.environ.get("APP_URL", "your dashboard")
-            parts = []
-            if urgent_count:
-                parts.append(f"{urgent_count} Urgent {'deal' if urgent_count == 1 else 'deals'}")
-            if opp_count:
-                parts.append(f"{opp_count} {'Opportunity' if opp_count == 1 else 'Opportunities'}")
-            summary = ", ".join(parts) if parts else f"{new_count} new leads"
-            body = f"KT Finds Scan Complete — {summary} found. Check your dashboard: {app_url}"
+        if urgent_count > 0 or opp_count > 0:
+            body = f"KT Finds: New deals just dropped! {urgent_count} urgent leads + {opp_count} opportunities waiting. Check them out: web-production-82e80.up.railway.app/leads"
             try:
                 from twilio.rest import Client as TwilioClient
                 client = TwilioClient(
