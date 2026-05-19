@@ -120,6 +120,10 @@ def run_scan(app):
                 log.info(f"New lead [{score['label'].upper()}]: {listing_data.get('title')} | ${listing_data.get('price',0):,} vs target ${f.target_price:,}")
 
         log.info(f"Scan complete — {new_count} new lead(s) ({urgent_count} urgent, {opp_count} opportunities)")
+        AppSettings.set("last_scan_at",     datetime.utcnow().isoformat())
+        AppSettings.set("last_scan_total",  new_count)
+        AppSettings.set("last_scan_urgent", urgent_count)
+        AppSettings.set("last_scan_opp",    opp_count)
 
         # Send one summary SMS if any new leads were found
         if urgent_count > 0 or opp_count > 0:

@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
@@ -111,6 +112,16 @@ def index():
         if job and job.next_run_time:
             next_run = job.next_run_time.strftime("%I:%M %p")
     settings = AppSettings.all_as_dict()
+    last_scan = None
+    _ls_at = AppSettings.get("last_scan_at")
+    if _ls_at:
+        _dt = datetime.fromisoformat(_ls_at).replace(tzinfo=timezone.utc)
+        last_scan = {
+            "at":     _dt,
+            "total":  int(AppSettings.get("last_scan_total",  0)),
+            "urgent": int(AppSettings.get("last_scan_urgent", 0)),
+            "opp":    int(AppSettings.get("last_scan_opp",    0)),
+        }
     title_unknown_leads = (
         Lead.query
         .filter_by(title_unknown=True)
@@ -120,6 +131,7 @@ def index():
     )
     return render_template("index.html", leads=leads, filters=filters,
                            stats=stats, next_run=next_run, settings=settings,
+                           last_scan=last_scan,
                            title_unknown_leads=title_unknown_leads)
 
 
