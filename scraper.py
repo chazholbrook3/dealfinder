@@ -21,8 +21,7 @@ log = logging.getLogger(__name__)
 KSL_CARS_BASE = "https://cars.ksl.com"
 KSL_SEARCH_BASE = f"{KSL_CARS_BASE}/v2/search"
 
-# Listings with these title types are never saved to the database
-SKIP_TITLE_TYPES = {"Salvage Title", "Rebuilt Title", "Lemon Law"}
+CLEAN_TITLE = "Clean Title"  # the only value that passes through to the database
 
 HEADERS = {
     "User-Agent": (
@@ -119,15 +118,15 @@ def scrape_listings(search_filter, max_results=20):
                     listing[k] = v
 
         title_type = listing.get("title_type", "")
-        log.info(f"  titleType={title_type!r:20s}  {listing.get('title')}")
+        log.info(f"  titleType={title_type!r:25s}  {listing.get('title')}")
 
-        if title_type in SKIP_TITLE_TYPES:
-            log.info(f"  → SKIPPED (bad title)")
+        if title_type != CLEAN_TITLE:
+            log.info(f"  → DISCARDED (not clean title)")
             skipped += 1
             continue
 
-        listing["title_unknown"] = (title_type != "Clean Title")
-        log.info(f"  → {'UNKNOWN TITLE' if listing['title_unknown'] else 'CLEAN — keeping'}")
+        listing["title_unknown"] = False
+        log.info(f"  → KEPT (Clean Title confirmed)")
         results.append(listing)
 
     log.info(
