@@ -8,7 +8,7 @@ from datetime import datetime
 
 from models import db, SearchFilter, Lead, AppSettings
 from scraper import scrape_listings
-from messaging import generate_messages, send_sms_alert
+from messaging import generate_messages
 from mmr import get_mmr, score_deal
 
 log = logging.getLogger(__name__)
@@ -28,7 +28,9 @@ def run_scan(app):
         }
 
         log.info(f"Scan started — {len(filters)} filter(s) | scoring by filter target price")
-        new_count = 0
+        new_count  = 0
+        urgent_count = 0
+        opp_count    = 0
 
         for f in filters:
             try:
@@ -109,42 +111,37 @@ def run_scan(app):
                     found_at       = datetime.utcnow(),
                 )
                 db.session.add(lead)
-                db.session.flush()
-
-                # Tier 1 = URGENT — text broker immediately to call himself
-                if score["tier"] == 1:
-                    pct_str = f"{score['pct_vs_mmr']:+.1f}%"
-                    urgent_body = (
-                        f"🚨 URGENT DEAL — {listing_data.get('title', 'Vehicle')}\n"
-                        f"Listed: ${listing_data.get('price', 0):,} | Target: ${f.target_price:,} ({pct_str} vs target)\n"
-                        f"CALL NOW: {listing_data.get('listing_url', '')}"
-                    )
-                    try:
-                        from twilio.rest import Client as TwilioClient
-                        client = TwilioClient(
-                            os.environ.get("TWILIO_ACCOUNT_SID"),
-                            os.environ.get("TWILIO_AUTH_TOKEN"),
-                        )
-                        client.messages.create(
-                            body=urgent_body[:1600],
-                            from_=os.environ.get("TWILIO_FROM_NUMBER"),
-                            to=os.environ.get("BROKER_PHONE"),
-                        )
-                        lead.sms_sent = True
-                        log.info(f"URGENT SMS sent for Tier 1 deal: {listing_data.get('title')}")
-                    except Exception as e:
-                        log.error(f"Urgent SMS failed: {e}")
-
-                # Tier 2 = OPPORTUNITY — standard SMS alert (no urgency)
-                elif score["tier"] == 2:
-                    try:
-                        sent = send_sms_alert(listing_data, messages.get("sms", ""))
-                        lead.sms_sent = sent
-                    except Exception as e:
-                        log.error(f"SMS alert error: {e}")
-
                 db.session.commit()
                 new_count += 1
+                if score["tier"] == 1:
+                    urgent_count += 1
+                elif score["tier"] == 2:
+                    opp_count += 1
                 log.info(f"New lead [{score['label'].upper()}]: {listing_data.get('title')} | ${listing_data.get('price',0):,} vs target ${f.target_price:,}")
 
-        log.info(f"Scan complete — {new_count} new lead(s)")
+        log.info(f"Scan complete — {new_count} new lead(s) ({urgent_count} urgent, {opp_count} opportunities)")
+
+        # Send one summary SMS if any new leads were found
+        if new_count > 0:
+            app_url = os.environ.get("APP_URL", "your dashboard")
+            parts = []
+            if urgent_count:
+                parts.append(f"{urgent_count} Urgent {'deal' if urgent_count == 1 else 'deals'}")
+            if opp_count:
+                parts.append(f"{opp_count} {'Opportunity' if opp_count == 1 else 'Opportunities'}")
+            summary = ", ".join(parts) if parts else f"{new_count} new leads"
+            body = f"KT Finds Scan Complete — {summary} found. Check your dashboard: {app_url}"
+            try:
+                from twilio.rest import Client as TwilioClient
+                client = TwilioClient(
+                    os.environ.get("TWILIO_ACCOUNT_SID"),
+                    os.environ.get("TWILIO_AUTH_TOKEN"),
+                )
+                client.messages.create(
+                    body=body[:1600],
+                    from_=os.environ.get("TWILIO_FROM_NUMBER"),
+                    to=os.environ.get("BROKER_PHONE"),
+                )
+                log.info(f"Summary SMS sent: {body}")
+            except Exception as e:
+                log.error(f"Summary SMS failed: {e}")
