@@ -30,6 +30,7 @@
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-sm" onclick="openEditModal({{ f.id }}, {{ f.name|tojson }}, {{ f.make|tojson }}, {{ f.model|tojson }}, {{ f.year_min }}, {{ f.year_max if f.year_max < 9999 else '' }}, {{ f.target_price }}, {{ f.miles_max if f.miles_max < 999999 else '' }}, {{ f.zip_code|tojson }}, {{ f.radius_mi }})">Edit</button>
           <form method="POST" action="/filters/{{ f.id }}/toggle" style="display:inline">
             <button class="btn btn-sm">{% if f.active %}Pause{% else %}Resume{% endif %}</button>
           </form>
@@ -102,4 +103,82 @@
   </div>
 
 </div>
+
+<!-- Edit filter modal -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border-radius:12px;padding:24px;width:100%;max-width:420px;margin:16px;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div class="section-title" style="margin:0">Edit search filter</div>
+      <button onclick="closeEditModal()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1">&times;</button>
+    </div>
+    <form id="edit-form" method="POST">
+      <div class="form-group">
+        <label class="field-label">Filter name</label>
+        <input type="text" name="name" id="edit-name" required/>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="field-label">Make</label>
+          <input type="text" name="make" id="edit-make" placeholder="Honda"/>
+        </div>
+        <div>
+          <label class="field-label">Model</label>
+          <input type="text" name="model" id="edit-model" placeholder="Civic"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="field-label">Year from</label>
+          <input type="number" name="year_min" id="edit-year-min" placeholder="2015"/>
+        </div>
+        <div>
+          <label class="field-label">Year to</label>
+          <input type="number" name="year_max" id="edit-year-max" placeholder="2023"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="field-label">Target price ($)</label>
+        <input type="number" name="target_price" id="edit-target-price" placeholder="e.g. 14000" min="0"/>
+      </div>
+      <div class="form-group">
+        <label class="field-label">Max mileage</label>
+        <input type="number" name="miles_max" id="edit-miles-max" placeholder="120000" min="0"/>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="field-label">ZIP code</label>
+          <input type="text" name="zip_code" id="edit-zip"/>
+        </div>
+        <div>
+          <label class="field-label">Radius (miles)</label>
+          <input type="number" name="radius_mi" id="edit-radius" min="10"/>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px">Save changes</button>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditModal(id, name, make, model, yearMin, yearMax, targetPrice, milesMax, zip, radius) {
+  document.getElementById('edit-form').action = '/filters/' + id + '/edit';
+  document.getElementById('edit-name').value = name;
+  document.getElementById('edit-make').value = make;
+  document.getElementById('edit-model').value = model;
+  document.getElementById('edit-year-min').value = yearMin || '';
+  document.getElementById('edit-year-max').value = yearMax || '';
+  document.getElementById('edit-target-price').value = targetPrice || '';
+  document.getElementById('edit-miles-max').value = milesMax || '';
+  document.getElementById('edit-zip').value = zip;
+  document.getElementById('edit-radius').value = radius;
+  const modal = document.getElementById('edit-modal');
+  modal.style.display = 'flex';
+}
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
+</script>
 {% endblock %}

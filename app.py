@@ -227,6 +227,24 @@ def toggle_filter(filter_id):
     return redirect(url_for("filters_page"))
 
 
+@app.route("/filters/<int:filter_id>/edit", methods=["POST"])
+def edit_filter(filter_id):
+    f = SearchFilter.query.get_or_404(filter_id)
+    f.name         = request.form.get("name", f.name)
+    f.make         = request.form.get("make", "")
+    f.model        = request.form.get("model", "")
+    f.year_min     = int(request.form.get("year_min")     or 0)
+    f.year_max     = int(request.form.get("year_max")     or 9999)
+    f.price_min    = int(request.form.get("price_min")    or 0)
+    f.price_max    = int(request.form.get("price_max")    or 999999)
+    f.miles_max    = int(request.form.get("miles_max")    or 999999)
+    f.target_price = int(request.form.get("target_price") or 0)
+    f.zip_code     = request.form.get("zip_code", f.zip_code)
+    f.radius_mi    = int(request.form.get("radius_mi")    or 100)
+    db.session.commit()
+    return redirect(url_for("filters_page"))
+
+
 @app.route("/filters/<int:filter_id>/delete", methods=["POST"])
 def delete_filter(filter_id):
     f = SearchFilter.query.get_or_404(filter_id)
