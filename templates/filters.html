@@ -30,7 +30,7 @@
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          <button class="btn btn-sm" onclick="openEditModal({{ f.id }}, {{ f.name|tojson }}, {{ f.make|tojson }}, {{ f.model|tojson }}, {{ f.year_min }}, {{ f.year_max if f.year_max < 9999 else '' }}, {{ f.target_price }}, {{ f.miles_max if f.miles_max < 999999 else '' }}, {{ f.zip_code|tojson }}, {{ f.radius_mi }})">Edit</button>
+          <button class="btn btn-sm" onclick="openEditModal({{ f.id }}, {{ f.name|tojson }}, {{ f.make|tojson }}, {{ f.model|tojson }}, {{ f.year_min or 'null' }}, {{ f.year_max if f.year_max < 9999 else 'null' }}, {{ f.target_price or 'null' }}, {{ f.miles_max if f.miles_max < 999999 else 'null' }}, {{ f.zip_code|tojson }}, {{ f.radius_mi }})">Edit</button>
           <form method="POST" action="/filters/{{ f.id }}/toggle" style="display:inline">
             <button class="btn btn-sm">{% if f.active %}Pause{% else %}Resume{% endif %}</button>
           </form>
@@ -159,20 +159,22 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
 <script>
 function openEditModal(id, name, make, model, yearMin, yearMax, targetPrice, milesMax, zip, radius) {
   document.getElementById('edit-form').action = '/filters/' + id + '/edit';
   document.getElementById('edit-name').value = name;
   document.getElementById('edit-make').value = make;
   document.getElementById('edit-model').value = model;
-  document.getElementById('edit-year-min').value = yearMin || '';
-  document.getElementById('edit-year-max').value = yearMax || '';
-  document.getElementById('edit-target-price').value = targetPrice || '';
-  document.getElementById('edit-miles-max').value = milesMax || '';
+  document.getElementById('edit-year-min').value = yearMin != null ? yearMin : '';
+  document.getElementById('edit-year-max').value = yearMax != null ? yearMax : '';
+  document.getElementById('edit-target-price').value = targetPrice != null ? targetPrice : '';
+  document.getElementById('edit-miles-max').value = milesMax != null ? milesMax : '';
   document.getElementById('edit-zip').value = zip;
   document.getElementById('edit-radius').value = radius;
-  const modal = document.getElementById('edit-modal');
-  modal.style.display = 'flex';
+  document.getElementById('edit-modal').style.display = 'flex';
 }
 function closeEditModal() {
   document.getElementById('edit-modal').style.display = 'none';

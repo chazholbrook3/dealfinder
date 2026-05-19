@@ -6,7 +6,7 @@
   <a href="/leads" class="text2" style="font-size:13px">← Back to leads</a>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+<div style="max-width:720px">
 
   <!-- Left: listing info -->
   <div>
@@ -72,28 +72,6 @@
     </div>
   </div>
 
-  <!-- Right: AI messages -->
-  <div>
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div class="section-title" style="margin-bottom:0">AI outreach</div>
-        <button class="btn btn-sm" onclick="regenerate(this)">Regenerate</button>
-      </div>
-
-      <div style="margin-bottom:14px">
-        <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.7px;color:var(--text2);margin-bottom:6px">Facebook DM</div>
-        <div id="fb-msg" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;line-height:1.7;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;min-height:80px">{{ lead.ai_message_fb or 'No message generated yet.' }}</div>
-        <button class="btn btn-sm" style="margin-top:8px" onclick="copyText(document.getElementById('fb-msg').textContent,'Facebook message copied!')">Copy</button>
-      </div>
-
-      <div>
-        <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.7px;color:var(--text2);margin-bottom:6px">SMS text</div>
-        <div id="sms-msg" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;line-height:1.7;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;min-height:60px">{{ lead.ai_message_sms or 'No message generated yet.' }}</div>
-        <div id="sms-chars" style="font-size:11px;color:var(--text3);margin-top:3px;font-family:var(--mono)"></div>
-        <button class="btn btn-sm" style="margin-top:8px" onclick="copyText(document.getElementById('sms-msg').textContent,'SMS copied!')">Copy</button>
-      </div>
-    </div>
-  </div>
 
 </div>
 {% endblock %}
@@ -122,36 +100,5 @@ async function saveNotes() {
   toast('Notes saved');
 }
 
-async function regenerate(btn) {
-  btn.disabled = true;
-  btn.textContent = 'Regenerating…';
-  try {
-    const r = await fetch(`/api/lead/${LEAD_ID}/regenerate`, { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      document.getElementById('fb-msg').textContent  = d.fb  || '';
-      document.getElementById('sms-msg').textContent = d.sms || '';
-      updateSmsCount();
-      toast('Messages regenerated!');
-    } else {
-      toast('Error: ' + d.error);
-    }
-  } catch(e) {
-    toast('Error: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Regenerate';
-  }
-}
-
-function updateSmsCount() {
-  const sms = document.getElementById('sms-msg').textContent;
-  const el  = document.getElementById('sms-chars');
-  const len = sms.length;
-  el.textContent = `${len} chars${len > 160 ? ' — may split into 2 SMS' : ''}`;
-  el.style.color = len > 160 ? 'var(--amber)' : 'var(--text3)';
-}
-
-updateSmsCount();
 </script>
 {% endblock %}
