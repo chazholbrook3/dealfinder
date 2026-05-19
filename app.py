@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
@@ -8,7 +8,7 @@ load_dotenv()
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.date import DateTrigger
 from sqlalchemy import inspect, text
 
 from models import db, SearchFilter, Lead, AppSettings
@@ -45,23 +45,93 @@ def age_days(dt):
 
 scheduler = BackgroundScheduler(daemon=True)
 
-def start_scheduler():
+def _now_mt():
+    """Current time as a naive Mountain Time datetime."""
+    return datetime.now(_MT).replace(tzinfo=None)
+
+def _default_next_scan_time():
+    """Next occurrence of 8:00 AM MT as a 'YYYY-MM-DDTHH:MM' string."""
+    now = _now_mt()
+    candidate = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    if candidate <= now:
+        candidate += timedelta(days=1)
+    return candidate.strftime("%Y-%m-%dT%H:%M")
+
+def run_and_reschedule():
+    """Run a scan then save the next scheduled time and re-arm the job."""
     from scanner import run_scan
-    interval = int(os.environ.get("SCAN_INTERVAL_MINUTES", 720))
-    scheduler.add_job(
-        func=lambda: run_scan(app),
-        trigger=IntervalTrigger(minutes=interval),
-        id="ksl_scan",
-        replace_existing=True,
-    )
-    scheduler.start()
-    log.info(f"Scheduler started — every {interval} min")
+    run_scan(app)
+    with app.app_context():
+        mode          = AppSettings.get("scan_repeat_mode", "daily")
+        interval_hrs  = int(AppSettings.get("scan_interval_hours", "12"))
+        prev_str      = AppSettings.get("next_scan_time", "")
+        try:
+            prev = datetime.fromisoformat(prev_str)
+        except (ValueError, TypeError):
+            prev = _now_mt()
+        if mode == "daily":
+            next_mt = prev + timedelta(days=1)
+        else:
+            next_mt = _now_mt() + timedelta(hours=max(1, interval_hrs))
+        AppSettings.set("next_scan_time", next_mt.strftime("%Y-%m-%dT%H:%M"))
+    apply_schedule()
+
+def apply_schedule():
+    """Read schedule settings from DB and arm (or disarm) the APScheduler job."""
+    with app.app_context():
+        enabled = AppSettings.get("scan_enabled", "true") == "true"
+        if not enabled:
+            try:
+                scheduler.remove_job("ksl_scan")
+            except Exception:
+                pass
+            log.info("Scheduled scan disabled")
+            return
+
+        next_str = AppSettings.get("next_scan_time")
+        if not next_str:
+            log.info("No next_scan_time set — schedule not armed")
+            return
+
+        mode         = AppSettings.get("scan_repeat_mode", "daily")
+        interval_hrs = int(AppSettings.get("scan_interval_hours", "12"))
+
+        try:
+            next_mt = datetime.fromisoformat(next_str)
+        except ValueError:
+            log.warning(f"Invalid next_scan_time value: {next_str!r}")
+            return
+
+        # If the stored time is in the past, advance to the next future occurrence
+        step = timedelta(days=1) if mode == "daily" else timedelta(hours=max(1, interval_hrs))
+        now  = _now_mt()
+        while next_mt <= now:
+            next_mt += step
+        AppSettings.set("next_scan_time", next_mt.strftime("%Y-%m-%dT%H:%M"))
+
+        next_utc = next_mt.replace(tzinfo=_MT).astimezone(timezone.utc)
+        scheduler.add_job(
+            func=run_and_reschedule,
+            trigger=DateTrigger(run_date=next_utc),
+            id="ksl_scan",
+            replace_existing=True,
+        )
+        log.info(f"Scan scheduled for {next_mt.strftime('%Y-%m-%d %H:%M')} MT ({mode})")
+
+def start_scheduler():
+    if not scheduler.running:
+        scheduler.start()
+    apply_schedule()
+    log.info("Scheduler started")
 
 # ── Default settings ──────────────────────────────────────────────────────────
 
 DEFAULT_SETTINGS = {
-    "tier1_pct":  "0",    # at or below MMR = urgent
-    "tier2_pct":  "10",   # up to 10% above MMR = opportunity
+    "tier1_pct":           "0",
+    "tier2_pct":           "10",
+    "scan_enabled":        "true",
+    "scan_repeat_mode":    "daily",
+    "scan_interval_hours": "12",
 }
 
 def ensure_defaults():
@@ -69,6 +139,8 @@ def ensure_defaults():
         if not AppSettings.query.filter_by(key=key).first():
             db.session.add(AppSettings(key=key, value=val))
     db.session.commit()
+    if not AppSettings.get("next_scan_time"):
+        AppSettings.set("next_scan_time", _default_next_scan_time())
 
 
 def ensure_columns():
@@ -119,6 +191,12 @@ def index():
         if job and job.next_run_time:
             next_run = job.next_run_time.strftime("%I:%M %p")
     settings = AppSettings.all_as_dict()
+    schedule = {
+        "enabled":        AppSettings.get("scan_enabled", "true") == "true",
+        "repeat_mode":    AppSettings.get("scan_repeat_mode", "daily"),
+        "interval_hours": AppSettings.get("scan_interval_hours", "12"),
+        "next_scan_time": AppSettings.get("next_scan_time", ""),
+    }
     last_scan = None
     _ls_at = AppSettings.get("last_scan_at")
     if _ls_at:
@@ -138,7 +216,7 @@ def index():
     )
     return render_template("index.html", leads=leads, filters=filters,
                            stats=stats, next_run=next_run, settings=settings,
-                           last_scan=last_scan,
+                           last_scan=last_scan, schedule=schedule,
                            title_unknown_leads=title_unknown_leads)
 
 
@@ -237,6 +315,23 @@ def save_settings():
         if key in data:
             AppSettings.set(key, data[key])
     return jsonify({"ok": True})
+
+
+@app.route("/api/schedule", methods=["POST"])
+def save_schedule():
+    data = request.get_json()
+    AppSettings.set("scan_enabled", "true" if data.get("scan_enabled", True) else "false")
+    mode = data.get("scan_repeat_mode", "daily")
+    if mode in ("daily", "interval"):
+        AppSettings.set("scan_repeat_mode", mode)
+    interval = data.get("scan_interval_hours")
+    if interval is not None:
+        AppSettings.set("scan_interval_hours", str(max(1, int(interval))))
+    next_time = data.get("next_scan_time")
+    if next_time:
+        AppSettings.set("next_scan_time", next_time)
+    apply_schedule()
+    return jsonify({"ok": True, "next_scan_time": AppSettings.get("next_scan_time", "")})
 
 
 @app.route("/filters", methods=["GET"])

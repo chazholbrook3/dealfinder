@@ -70,6 +70,50 @@
   </div>
 </div>
 
+<!-- Scheduled Scan -->
+<div class="card" style="margin-bottom:20px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div>
+      <div class="section-title" style="margin-bottom:2px">Scheduled scan</div>
+      <div class="text2" style="font-size:12px">Auto-run KSL scans on a repeating schedule</div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px">
+      <input type="checkbox" id="scan-enabled" {% if schedule.enabled %}checked{% endif %} style="width:15px;height:15px;cursor:pointer;accent-color:var(--green)">
+      Enable
+    </label>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div>
+      <label class="field-label">Next scan (Mountain Time)</label>
+      <input type="datetime-local" id="next-scan-time" value="{{ schedule.next_scan_time }}"/>
+    </div>
+    <div>
+      <label class="field-label">Repeat</label>
+      <div style="display:flex;flex-direction:column;gap:10px;padding-top:6px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="radio" name="scan-mode" value="daily" {% if schedule.repeat_mode == 'daily' %}checked{% endif %} style="accent-color:var(--green)">
+          Daily at same time
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="radio" name="scan-mode" value="interval" {% if schedule.repeat_mode == 'interval' %}checked{% endif %} style="accent-color:var(--green)">
+          Every
+          <input type="number" id="interval-hours" value="{{ schedule.interval_hours }}" min="1" max="168"
+            style="width:58px" {% if schedule.repeat_mode != 'interval' %}disabled{% endif %}>
+          hours
+        </label>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <button class="btn btn-primary btn-sm" onclick="saveSchedule(this)">Save schedule</button>
+    <div id="schedule-status" class="text2" style="font-size:12px">
+      {% if schedule.next_scan_time %}
+        Next: {{ schedule.next_scan_time | replace('T', ' ') }} MT &mdash; {% if schedule.enabled %}enabled{% else %}disabled{% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 <!-- Quick actions -->
 <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
   <button class="btn btn-primary" onclick="triggerScan(this)">
@@ -324,6 +368,45 @@ async function hideLead(btn) {
   toast('Lead hidden');
 }
 
+
+document.querySelectorAll('input[name="scan-mode"]').forEach(function(r) {
+  r.addEventListener('change', function() {
+    document.getElementById('interval-hours').disabled = (this.value !== 'interval');
+  });
+});
+
+async function saveSchedule(btn) {
+  btn.disabled = true;
+  const enabled   = document.getElementById('scan-enabled').checked;
+  const nextTime  = document.getElementById('next-scan-time').value;
+  const mode      = document.querySelector('input[name="scan-mode"]:checked').value;
+  const hours     = parseInt(document.getElementById('interval-hours').value) || 12;
+  try {
+    const r = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        scan_enabled:        enabled,
+        next_scan_time:      nextTime,
+        scan_repeat_mode:    mode,
+        scan_interval_hours: hours,
+      })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast('Schedule saved!');
+      const el = document.getElementById('schedule-status');
+      if (el && d.next_scan_time) {
+        el.textContent = 'Next: ' + d.next_scan_time.replace('T', ' ') + ' MT — ' + (enabled ? 'enabled' : 'disabled');
+      }
+    } else {
+      toast('Error saving schedule');
+    }
+  } catch(e) {
+    toast('Error: ' + e.message);
+  }
+  btn.disabled = false;
+}
 
 async function saveThresholds() {
   const t1 = document.getElementById('tier1_pct').value;
